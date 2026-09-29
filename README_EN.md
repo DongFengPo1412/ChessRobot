@@ -54,7 +54,7 @@ This project represents the capstone engineering design for *Intelligent Control
 
 | Developer | Role | Core Modules & Technical Deliverables |
 | :--- | :--- | :--- |
-| **Tian Jinshuo (田金硕)** | **Team Lead / Mechanical & Motion Lead** | <ul><li>4-DOF robotic arm mechanical assembly, structural calibration & joint tuning (RDS3235 35kg·cm high-torque servos)</li><li>WCH CH347 high-speed USB-to-I2C bridge and PCA9685 12-bit PWM hardware layer driver (`hardware.py`)</li><li>Analytical Inverse Kinematics (IK) formulation and joint deadzone feedforward compensation (`kinematics.py`)</li><li>Micro-space 3-phase collision-free pick-and-place waypoint trajectory planning (`control.py`)</li></ul> |
+| **Tian Junshuo (田峻硕)** | **Team Lead / Mechanical & Motion Lead** | <ul><li>4-DOF robotic arm mechanical assembly, structural calibration & joint tuning (RDS3235 35kg·cm high-torque servos)</li><li>WCH CH347 high-speed USB-to-I2C bridge and PCA9685 12-bit PWM hardware layer driver (`hardware.py`)</li><li>Analytical Inverse Kinematics (IK) formulation and joint deadzone feedforward compensation (`kinematics.py`)</li><li>Micro-space 3-phase collision-free pick-and-place waypoint trajectory planning (`control.py`)</li></ul> |
 | **Liu Chaoran (刘超然)** | **Vision & System Integration Lead / Defense Speaker** | <ul><li>OpenCV $3 \times 3$ Homography perspective calibration and millimeter-level real-world coordinate mapping (`localization/`)</li><li>YOLO deep learning object detection model deployment, quantization, and CUDA acceleration (`yolo11n.pt`)</li><li>Multi-frame temporal sliding window consensus voting mechanism and hand occlusion rejection algorithm</li><li>Asynchronous multi-threaded pipeline architecture and PyQt5 telemetry GUI dashboard (`ui_main.py`)</li><li>Defense presentation design, technical report synthesis, and live defense presentation</li></ul> |
 | **Zhang Zichen (张子琛)** | **Game Decision & Rule Engine Lead** | <ul><li>Chinese Chess standard rule engine, legal move generator, and 14-channel spatial tensor state representation (`game/`)</li><li>Alpha-Beta minimax game tree search algorithm with dynamic board evaluation heuristics</li><li>Move legality verification and check/checkmate/stalemate trap handling</li></ul> |
 | **Xing Yilong (邢艺龙)** | **Dataset & Fixture Lead** | <ul><li>14-class Chinese chess piece multi-illumination custom dataset collection, annotation, and augmentation</li><li>Acrylic magnetic board fabrication, piece magnetic disc assembly, and end-effector electromagnet fixture</li><li>Physical harness assembly, wiring test bench construction, and integration testing</li></ul> |
@@ -371,7 +371,7 @@ python tools/servo_tester.py
 This project is licensed under the **[MIT License](LICENSE)**.
 
 - **Core Engineering Team (Group 07)**:
-  - **Tian Jinshuo (田金硕)**: Mechanical Assembly, Hardware Bus Communication & Inverse Kinematics
+  - **Tian Junshuo (田峻硕)**: Mechanical Assembly, Hardware Bus Communication & Inverse Kinematics
   - **Liu Chaoran (刘超然)**: Vision Detection, Homography Calibration, Multi-Threaded CPS Pipeline & PyQt5 GUI
   - **Zhang Zichen (张子琛)**: Game Decision Heuristics, Chinese Chess Rule Engine & Board Modeling
   - **Xing Yilong (邢艺龙)**: Dataset Engineering, Fixture Fabrication & Hardware Test Bench Construction

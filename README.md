@@ -54,7 +54,7 @@
 
 | 开发者 | 核心工程角色 | 核心研发模块与技术落地 |
 | :--- | :--- | :--- |
-| **田峻硕 (Tian Jinshuo)** | **团队组长 / 机械与运动控制负责人** | <ul><li>四自由度机械臂硬件结构调优与装配（RDS3235 35kg·cm 高扭矩金属数码舵机）</li><li>WCH CH347 高速 USB-I2C 桥接与 PCA9685 12-bit PWM 硬件层封装（`hardware.py`）</li><li>空间解析逆运动学（Analytical IK）算法推导与前馈死区补偿（`kinematics.py`）</li><li>微距空间三段式无碰撞抓放轨迹规划控制律（`control.py`）</li></ul> |
+| **田峻硕 (Tian Junshuo)** | **团队组长 / 机械与运动控制负责人** | <ul><li>四自由度机械臂硬件结构调优与装配（RDS3235 35kg·cm 高扭矩金属数码舵机）</li><li>WCH CH347 高速 USB-I2C 桥接与 PCA9685 12-bit PWM 硬件层封装（`hardware.py`）</li><li>空间解析逆运动学（Analytical IK）算法推导与前馈死区补偿（`kinematics.py`）</li><li>微距空间三段式无碰撞抓放轨迹规划控制律（`control.py`）</li></ul> |
 | **刘超然 (Liu Chaoran)** | **视觉感知与系统集成负责人 / 答辩主讲人** | <ul><li>OpenCV 单应性变换（$3 \times 3$ Homography）棋盘几何自校正与毫米级物理坐标映射（`localization/`）</li><li>YOLO 目标检测模型部署、量化与 TensorRT/CUDA 硬件加速推理（`yolo11n.pt`）</li><li>多帧滑动窗口共识投票机制设计与人类手部遮挡鲁棒性判决算法</li><li>端到端多线程解耦架构构建与 PyQt5 异步图形交互控制台开发（`ui_main.py`）</li><li>项目答辩演示文稿设计、技术设计报告统稿与答辩现场汇报</li></ul> |
 | **张子琛 (Zhang Zichen)** | **博弈决策与规则引擎负责人** | <ul><li>中国象棋全规则引擎构建、合法走法生成与 14 通道棋盘状态张量编码（`game/`）</li><li>Alpha-Beta 剪枝极大极小博弈搜索树算法与动态局面评估函数实现</li><li>走子合法性校验与杀棋/将军/困毙判定机制开发</li></ul> |
 | **邢艺龙 (Xing Yilong)** | **工装搭建与数据集工程负责人** | <ul><li>自建中国象棋 14 类棋子多光照多角度真实图像数据集采集与标注增强</li><li>定制吸附式棋盘制作、棋子导磁金属贴片工艺与电磁吸盘末端工装搭建</li><li>硬件全流程实物连线组装、实验台架测试与联调支持</li></ul> |
@@ -379,7 +379,7 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
 本项目依据 **[MIT License](LICENSE)** 协议开源。
 
 - **核心工程团队（第七组）**：
-  - **田金硕 (Tian Jinshuo)**：机械机构组装、底层硬件驱动与逆运动学规划
+  - **田峻硕 (Tian Junshuo)**：机械机构组装、底层硬件驱动与逆运动学规划
   - **刘超然 (Liu Chaoran)**：视觉感知检测、单应性几何校正、多线程架构与 PyQt5 UI 控制台
   - **张子琛 (Zhang Zichen)**：博弈算法、中国象棋规则引擎与棋局推演
   - **邢艺龙 (Xing Yilong)**：工装制作、数据集标注增强与系统联调
