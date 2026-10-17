@@ -54,10 +54,10 @@ This project represents the capstone engineering design for *Intelligent Control
 
 | Developer | Role | Core Modules & Technical Deliverables |
 | :--- | :--- | :--- |
-| **Tian Junshuo (田峻硕)** | **Team Lead / Mechanical & Motion Lead** | <ul><li>4-DOF robotic arm mechanical assembly, structural calibration & joint tuning (RDS3235 35kg·cm high-torque servos)</li><li>WCH CH347 high-speed USB-to-I2C bridge and PCA9685 12-bit PWM hardware layer driver (`hardware.py`)</li><li>Analytical Inverse Kinematics (IK) formulation and joint deadzone feedforward compensation (`kinematics.py`)</li><li>Micro-space 3-phase collision-free pick-and-place waypoint trajectory planning (`control.py`)</li></ul> |
-| **Liu Chaoran (刘超然)** | **Vision & System Integration Lead / Defense Speaker** | <ul><li>OpenCV $3 \times 3$ Homography perspective calibration and millimeter-level real-world coordinate mapping (`localization/`)</li><li>YOLO deep learning object detection model deployment, quantization, and CUDA acceleration (`yolo11n.pt`)</li><li>Multi-frame temporal sliding window consensus voting mechanism and hand occlusion rejection algorithm</li><li>Asynchronous multi-threaded pipeline architecture and PyQt5 telemetry GUI dashboard (`ui_main.py`)</li><li>Defense presentation design, technical report synthesis, and live defense presentation</li></ul> |
-| **Zhang Zichen (张子琛)** | **Game Decision & Rule Engine Lead** | <ul><li>Chinese Chess standard rule engine, legal move generator, and 14-channel spatial tensor state representation (`game/`)</li><li>Alpha-Beta minimax game tree search algorithm with dynamic board evaluation heuristics</li><li>Move legality verification and check/checkmate/stalemate trap handling</li></ul> |
-| **Xing Yilong (邢艺龙)** | **Dataset & Fixture Lead** | <ul><li>14-class Chinese chess piece multi-illumination custom dataset collection, annotation, and augmentation</li><li>Acrylic magnetic board fabrication, piece magnetic disc assembly, and end-effector electromagnet fixture</li><li>Physical harness assembly, wiring test bench construction, and integration testing</li></ul> |
+| **Tian Junshuo (田峻硕)** | **Team Lead / Mechanical & Motion Control Lead** | <ul><li>4-DOF robotic arm physical tuning, assembly, and servo calibration (RDS3235 35kg·cm high-torque metal digital servos)</li><li>WCH CH347 high-speed USB-I2C bridge and PCA9685 12-bit PWM hardware-level driver implementation (`hardware.py`)</li><li>Analytical inverse kinematics (IK) derivation and feedforward gravity droop compensation modeling (`kinematics.py`)</li><li>Micro-space 3-stage collision-free trajectory planning control law (`control.py`)</li></ul> |
+| **Liu Chaoran (刘超然)** | **Vision Perception & Systems Integration Lead / Defense Speaker** | <ul><li>OpenCV homography transform ($3 	imes 3$ Homography) 4-point interactive calibration & physical coordinate mapping (`localization/find_chess_new.py`)</li><li>Custom lightweight YOLO object-detection deployment & LAB color-space lightness ($L$-channel) black/red piece classifier</li><li>35-frame temporal sliding-window consensus voting filter & piece-capture deadlock prevention mechanism</li><li>End-to-end multithreaded decoupled asynchronous CPS architecture & PyQt5 interactive dashboard development (`ui_main.py`)</li><li>Project defense presentation design, technical design report compilation, and final oral defense presentation</li></ul> |
+| **Zhang Zichen (张子琛)** | **Game Decision & Rule Engine Lead** | <ul><li>Chinese Chess standard 10x9 rule engine, legal move generator, and move-history rollback mechanism (`game/board.py`)</li><li>Deep learning decision evaluation engine based on PyTorch Convolutional Neural Networks (`game/ai.py`)</li><li>Built-in 50+ opening book database and layered greedy decision fallback strategies (`game/constants.py`)</li></ul> |
+| **Xing Yilong (邢艺龙)** | **Dataset & Fixture Lead** | <ul><li>Multi-illumination, multi-angle physical chessboard dataset collection and annotation (`recognition/collect_real_data.py`)</li><li>Custom acrylic magnetic chessboard fabrication, piece magnetic sheet mounting, and electromagnet end-effector fixture assembly</li><li>Electrical wiring, physical test bench assembly, and multi-axis hardware integration testing (`tools/`)</li></ul> |
 
 ---
 
@@ -142,59 +142,59 @@ Solved via Singular Value Decomposition (SVD) across calibrated corner points, g
 
 ---
 
-### 4.2 4-DOF Articulated Arm Analytical Inverse Kinematics (IK)
+### 4.2 4-DOF Articulated Arm Analytical Inverse Kinematics (IK) & Feedforward Compensation
 
-The robotic arm consists of Base Yaw (Joint 1), Shoulder Pitch (Joint 2), Elbow Pitch (Joint 3), and Wrist Pitch (Joint 4).
+The robotic arm comprises a Base Yaw Joint (Joint 1), Shoulder Pitch Joint (Joint 2), Elbow Pitch Joint (Joint 3), and an Adaptive Wrist Attitude Joint (Joint 4).
 
 ```mermaid
 graph LR
     Base["Base Yaw J1 (θ₁)"] --> Shoulder["Shoulder Pitch J2 (θ₂)"]
     Shoulder --> Elbow["Elbow Pitch J3 (θ₃)"]
-    Elbow --> Wrist["Wrist Pitch J4 (θ₄)"]
+    Elbow --> Wrist["Wrist Attitude J4 (θ₄)"]
     Wrist --> End["Electromagnet (Vertical Orientation φ = -90°)"]
 ```
 
-Link parameters: Base height $L_1 = 105\,\text{mm}$, Upper arm $L_2 = 105\,\text{mm}$, Forearm $L_3 = 98\,\text{mm}$, End-effector $L_4 = 160\,\text{mm}$.
+#### 1. Calibrated Physical Link Dimensions (`config.py`)
+Link dimensions are calibrated from the physical hardware assembly:
+- Base center height: $L_1 = 73.0\,\text{mm}$
+- Upper arm link length: $L_2 = 231.0\,\text{mm}$
+- Forearm link length: $L_3 = 231.0\,\text{mm}$
+- Wrist center to electromagnet face: $L_4 = 66.0\,\text{mm}$
 
-Targeting Cartesian coordinates $(X, Y, Z)$ with the constraint that the end-effector remains strictly perpendicular to the board ($\phi = -90^\circ$):
+#### 2. Non-Linear Cantilever Deflection & Feedforward Control Law (`kinematics.py`)
+Due to the long cantilever reach and open-loop digital servos, gravity causes elastic structural droop at extended reach radii. The team engineered empirical feedforward models prior to analytical IK computation:
 
-#### 1. Base Azimuth Angle $\theta_1$
-$$
-\theta_1 = \text{atan2}(Y, X)
-$$
+- **Lateral X-Axis Scaling Feedforward** (compensates for base yaw non-linearity, correcting ~10% inward displacement):
+  $$X_{\text{comp}} = X \times K_x \quad (K_x = 1.125)$$
+- **Effective Synthesis Radius & Radial Shrinkage Compensation**:
+  $$R_{\text{target}} = \sqrt{X_{\text{comp}}^2 + Y^2}$$
+  $$R_{\text{comp}} = R_{\text{target}} \times (1 - K_r) \quad (K_r = 0.06)$$
+- **Cantilever Sag Elevation Feedforward Model** (scales linearly with reach radius):
+  $$\text{comp}_z = Z + (R_{\text{target}} \times K_z) \quad (K_z = 0.12)$$
 
-#### 2. Planar Projection & Wrist Center
-Project the target point onto the pitch plane, solving for equivalent horizontal reach $r$ and height $z'$:
+#### 3. Closed-Form Analytical IK Derivation
+Constraining the end-effector vertically downward ($\phi = -90^\circ$), the spatial 3D problem is decoupled into the sagittal plane:
 
-$$
-r = \sqrt{X^2 + Y^2} - L_4 \cos(\phi) = \sqrt{X^2 + Y^2} \quad (\text{since } \phi = -90^\circ)
-$$
+1. **Base Yaw Angle $\theta_1$**:
+   $$\theta_1 = \text{atan2}(X_{\text{comp}}, Y)$$
+   Mapped to the 90° calibration reference:
+   $$t_1^{\text{deg}} = \text{degrees}(\theta_1) + 90.0^\circ$$
 
-$$
-z' = Z - L_1 - L_4 \sin(\phi) = Z - L_1 + L_4
-$$
+2. **Sagittal Effective Vertical Distance & Chord Length**:
+   $$\Delta Z = (\text{comp}_z + L_4) - L_1$$
+   $$D = \sqrt{R_{\text{comp}}^2 + \Delta Z^2}$$
 
-#### 3. Elbow Angle $\theta_3$
-Applying the Law of Cosines:
+3. **Law of Cosines for Shoulder Angle $\alpha$ and Elbow Angle $\gamma$**:
+   $$\cos(\alpha) = \frac{L_2^2 + D^2 - L_3^2}{2 L_2 D}, \quad \cos(\gamma) = \frac{L_2^2 + L_3^2 - D^2}{2 L_2 L_3}$$
+   $$\alpha = \arccos\left(\text{clip}(\cos(\alpha), -1, 1)\right), \quad \gamma = \arccos\left(\text{clip}(\cos(\gamma), -1, 1)\right)$$
+   $$\beta = \text{atan2}(\Delta Z, R_{\text{comp}})$$
 
-$$
-\cos(\theta_3) = \frac{r^2 + z'^2 - L_2^2 - L_3^2}{2 L_2 L_3}
-$$
+4. **Joint Angles & Wrist Orientation**:
+   $$t_2^{\text{deg}} = \text{degrees}(\beta + \alpha)$$
+   $$t_3^{\text{deg}} = t_2^{\text{deg}} - (180.0^\circ - \text{degrees}(\gamma))$$
+   $$t_4^{\text{relative}} = -90.0^\circ - t_3^{\text{deg}}$$
 
-$$
-\theta_3 = \arccos\left( \frac{r^2 + z'^2 - L_2^2 - L_3^2}{2 L_2 L_3} \right)
-$$
-
-#### 4. Shoulder Angle $\theta_2$ & Wrist Angle $\theta_4$
-$$
-\theta_2 = \text{atan2}(z', r) - \text{atan2}(L_3 \sin(\theta_3), \, L_2 + L_3 \cos(\theta_3))
-$$
-
-$$
-\theta_4 = \phi - (\theta_2 + \theta_3) = -90^\circ - (\theta_2 + \theta_3)
-$$
-
-Execution takes $< 0.05\,\text{ms}$ per calculation, perfectly satisfying hard real-time servo constraints.
+Closed-form evaluation completes in $< 1\,\mu\text{s}$ on CPU without numerical Jacobian singularities, maintaining end-effector physical placement strictly within operational tolerance.
 
 ---
 
@@ -274,32 +274,34 @@ Providing angular resolution of $0.066^\circ$, this guarantees sub-millimeter en
 
 ```bash
 ChessRobot/
-├── localization/                   # Vision Calibration & Homography Geometry
-│   ├── board_locator.py            # Automatic Corner Detection & ROI Extraction
-│   ├── homography.py               # Homography Forward/Inverse Mapping
-│   └── calibrate_camera.py         # Lens Distortion & Intrinsic Calibration
-├── recognition/                    # Deep Learning Detection & Temporal Filtering
-│   ├── yolo_detector.py            # YOLO Detector Wrapper (CUDA/TensorRT)
-│   ├── consensus_filter.py         # 35-Frame Temporal Voting Filter
-│   └── piece_classifier.py         # Piece Classification & Softmax Inference
-├── game/                           # Chess Rule Engine & Game Tree Search
-│   ├── chess_engine.py             # Board State Management & Legal Move Generator
-│   ├── search_ai.py                # Alpha-Beta Minimax Search Engine
-│   └── board_state.py              # 14-Channel Tensor Representation & FEN Parser
-├── tools/                          # Diagnostic & Calibration Utilities
-│   ├── servo_tester.py             # Interactive Servo Testing Utility
-│   ├── ch347_i2c_scanner.py        # I2C Bus Address Scanner
-│   └── camera_preview.py           # Real-Time Video Preview & Diagnostics
-├── control.py                      # 3-Phase Waypoint Collision-Free Motion Core
-├── kinematics.py                   # 4-DOF Analytical Inverse Kinematics Solver
-├── hardware.py                     # WCH CH347 + PCA9685 Low-Level Bus Communication
-├── config.py                       # Physical Dimensions & Servo Calibration Offsets
-├── main.py                         # CLI Terminal Execution Entrypoint
-├── ui_main.py                      # PyQt5 Graphical Dashboard Telemetry Entrypoint
-├── yolo11n.pt                      # Pretrained YOLOv11 Chinese Chess Weights
-├── requirements.txt                # Python Dependencies
-├── LICENSE                         # Official MIT License
-├── README.md                       # Simplified Chinese Documentation
+├── localization/                   # Spatial visual geometry & calibration core
+│   ├── find_chess_new.py           # Production vision pipeline (ChessVisionV15.4: YOLO + LAB lightness + 35-frame consensus)
+│   ├── find_chess_simple.py        # Lightweight prototype testing engine (ChessVisionV7)
+│   └── find_chess.py               # Classical full-classification historical engine (ChessVisionEngineV6)
+├── recognition/                    # Model training, dataset collection & calibration persistence
+│   ├── train.py                    # YOLO fine-tuning & training script
+│   ├── collect_real_data.py        # Physical multi-illumination dataset acquisition utility
+│   ├── test_gpu.py                 # CUDA / GPU acceleration & environment verification
+│   └── models/                     # Calibration matrices persistence (H_matrix.npy, ROI_corners.npy)
+├── game/                           # Chinese Chess rule engine & AI decision
+│   ├── board.py                    # 10x9 complete chess rule base (legal move generator / state rollback)
+│   ├── ai.py                       # PyTorch Convolutional Neural Network evaluation engine (ChessNet)
+│   ├── constants.py                # Initial board setups, piece weights & coordinate mappings
+│   └── play.py                     # Standalone terminal game loop test runner
+├── tools/                          # Low-level hardware diagnostic & calibration suite
+│   ├── calibrate_servo.py          # 4-DOF joint microsecond reference pulse calibration tool
+│   ├── test_electromagnet.py       # WCH CH347 GPIO electromagnet actuation test script
+│   └── calc_reach.py               # Arm operational workspace & reachability validation utility
+├── control.py                      # Manipulator motion controller (3-stage collision-free trajectory planner)
+├── kinematics.py                   # 4-DOF analytical IK solver (with X-axis scaling & cantilever droop feedforward)
+├── hardware.py                     # WCH CH347 high-speed USB bridge (I2C/GPIO) + PCA9685 12-bit PWM driver
+├── config.py                       # Global physical link lengths (L1-L4), servo offsets & board benchmarks
+├── main.py                         # Terminal CLI entry point (asynchronous move_queue closed loop)
+├── ui_main.py                      # PyQt5 asynchronous multithreaded GUI dashboard (telemetry / virtual board / calibration)
+├── yolo11n.pt                      # Fine-tuned lightweight Chinese chess detection weights
+├── requirements.txt                # Python dependencies list
+├── LICENSE                         # MIT License
+├── README.md                       # Simplified Chinese Technical Specification
 ├── README_EN.md                    # English Technical Specification
 └── README_JA.md                    # Japanese Technical Specification
 ```

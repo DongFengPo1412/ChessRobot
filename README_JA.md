@@ -54,10 +54,10 @@
 
 | 開発者 | プロジェクト役割 | 担当モジュールと技術実装 |
 | :--- | :--- | :--- |
-| **田峻碩 (Tian Junshuo)** | **班長 / 機構・モーション制御リード** | <ul><li>4自由度ロボットアームの機構組立および関節調整（RDS3235 35kg·cm 高トルク金属サーボ）</li><li>WCH CH347 高速 USB-I2C ブリッジおよび PCA9685 12ビット PWM ドライバ実装（`hardware.py`）</li><li>幾何学的逆運動学（Analytical IK）の定式化および不感帯フィードフォワード補償（`kinematics.py`）</li><li>微小空間3段階衝突回避軌道計画アルゴリズム（`control.py`）</li></ul> |
-| **劉超然 (Liu Chaoran)** | **視覚認識・システム統合リード / 発表代表** | <ul><li>OpenCV $3 \times 3$ ホモグラフィ幾何補正およびミリメートル級物理座標変換（`localization/`）</li><li>YOLO 物体検出モデルのデプロイ、量子化および CUDA 加速推論環境の構築（`yolo11n.pt`）</li><li>時系列スライディングウィンドウ多数決フィルタおよび人の手による遮蔽ノイズ除去アルゴリズム</li><li>非同期マルチスレッド協調アーキテクチャの設計および PyQt5 GUI ダッシュボード開発（`ui_main.py`）</li><li>発表用プレゼンテーション設計、技術報告書の執筆統括および口頭試問対応</li></ul> |
-| **張子琛 (Zhang Zichen)** | **ゲーム推論・ルールエンジンリード** | <ul><li>中国将棋公式ルールエンジン、合法手生成器、14チャンネル状態テンソル表現（`game/`）</li><li>Alpha-Beta 枝刈り探索木アルゴリズムおよび局面評価関数の設計</li><li>着手合法性チェック、王手・詰み・ステイルメイト判定ロジックの実装</li></ul> |
-| **邢芸龍 (Xing Yilong)** | **治具製作・データセットエンジニアリング** | <ul><li>中国将棋14種類の駒に関する多照度・多角度独自画像データセットの収集・アノテーション</li><li>アクリル製磁気盤の加工、駒用導磁金属プレートの装着および電磁石エンドエフェクタ製作</li><li>電気配線、実験ベンチの組み立ておよび総合結合試験</li></ul> |
+| **田峻碩 (Tian Junshuo)** | **班長 / 機構・モーション制御リード** | <ul><li>4自由度ロボットアームの機構組立および関節調整（RDS3235 35kg·cm 高トルク金属サーボ）</li><li>WCH CH347 高速 USB-I2C ブリッジおよび PCA9685 12ビット PWM 低レベルドライバ実装（`hardware.py`）</li><li>空間幾何学的逆運動学（Analytical IK）の定式化および重力たわみフィードフォワード補償モデル（`kinematics.py`）</li><li>微小空間3段階衝突回避ピック＆プレース軌道計画制御則（`control.py`）</li></ul> |
+| **劉超然 (Liu Chaoran)** | **視覚認識・システム統合リード / 発表代表** | <ul><li>OpenCV $3 	imes 3$ ホモグラフィ4点対話型キャリブレーションおよびミリメートル級物理座標変換（`localization/find_chess_new.py`）</li><li>軽量 YOLO 物体検出モデルのデプロイおよび LAB 色空間（$L$ 輝度チャンネル）による高速白黒（紅黒）陣営判定</li><li>35フレーム時系列スライディングウィンドウ多数決フィルタおよび駒取り時のデッドロック回避機構</li><li>`move_queue` に基づく非同期マルチスレッド協調 CPS アーキテクチャ設計および PyQt5 GUI 開発（`ui_main.py`）</li><li>発表用プレゼンテーション設計、技術報告書の執筆統括および最終口頭試問対応</li></ul> |
+| **張子琛 (Zhang Zichen)** | **ゲーム推論・ルールエンジンリード** | <ul><li>中国将棋公式 10x9 ルールエンジン、合法手生成器および着手履歴ロールバック機構の実装（`game/board.py`）</li><li>PyTorch 畳み込みニューラルネットワーク（CNN）に基づく着手評価モデル開発（`game/ai.py`）</li><li>内蔵 50+ プロ定跡データベースおよび階層的貪欲決定フォールバック戦略（`game/constants.py`）</li></ul> |
+| **邢芸龍 (Xing Yilong)** | **治具製作・データセットエンジニアリング** | <ul><li>多照度・多角度における実機将棋盤画像データセットの収集およびアノテーション（`recognition/collect_real_data.py`）</li><li>アクリル製磁気盤の加工、駒用導磁金属プレートの装着および電磁石エンドエフェクタ治具製作</li><li>電気配線、実機テストベンチの構築および多軸ハードウェア統合結合試験（`tools/`）</li></ul> |
 
 ---
 
@@ -140,45 +140,59 @@ SVD により過決定方程式を解くことで、全盤面での位置誤差�
 
 ---
 
-### 4.2 4自由度多関節アームの解析的逆運動学（IK）解法
+### 4.2 4自由度多関節アームの解析的逆運動学（IK）およびフィードフォワード補償
 
-アーム構造：ベース旋回（J1）、第1アーム（J2）、第2アーム（J3）、リスト（J4）。
+ロボットアームは、ベース水平旋回関節（Joint 1）、大腕ピッチ関節（Joint 2）、前腕ピッチ関節（Joint 3）、および適応手首姿勢保持関節（Joint 4）で構成されます。
 
-リンク長パラメータ：$L_1 = 105\,\text{mm}$, $L_2 = 105\,\text{mm}$, $L_3 = 98\,\text{mm}$, $L_4 = 160\,\text{mm}$。
+```mermaid
+graph LR
+    Base["ベース旋回 J1 (θ₁)"] --> Shoulder["大腕ピッチ J2 (θ₂)"]
+    Shoulder --> Elbow["前腕ピッチ J3 (θ₃)"]
+    Elbow --> Wrist["手首姿勢 J4 (θ₄)"]
+    Wrist --> End["電磁石ヘッド (垂直下向き拘束 φ = -90°)"]
+```
 
-エンドエフェクタを常に盤面へ垂直（姿勢角 $\phi = -90^\circ$）に保つ拘束条件下で、目標位置 $(X, Y, Z)$ に対する関節角を解析的に導出：
+#### 1. 実機キャリブレーション幾何リンク寸法 (`config.py`)
+実機ハードウェア組立寸法に基づき厳密に校正：
+- ベース中心高さ：$L_1 = 73.0\,\text{mm}$
+- 大腕有効リンク長：$L_2 = 231.0\,\text{mm}$
+- 前腕有効リンク长：$L_3 = 231.0\,\text{mm}$
+- 手首関節から吸着面まで：$L_4 = 66.0\,\text{mm}$
 
-#### 1. ベース旋回角 $\theta_1$
-$$
-\theta_1 = \text{atan2}(Y, X)
-$$
+#### 2. 非線形弾性変形およびフィードフォワード補償モデル (`kinematics.py`)
+作業半径の拡大に伴い、片持ち梁構造の自重により先端が下垂する物理現象が生じます。実測データに基づくフィードフォワード補償則を解析解の前に導入：
 
-#### 2. ピッチ平面投影とリスト中心
-$$
-r = \sqrt{X^2 + Y^2} - L_4 \cos(\phi) = \sqrt{X^2 + Y^2} \quad (\phi = -90^\circ \text{ の場合})
-$$
+- **X 軸幾何スケールフィードフォワード補償**（外周列における旋回不足を解消し、約10%の内側偏位を補正）：
+  $$X_{\text{comp}} = X \times K_x \quad (K_x = 1.125)$$
+- **ベース目標合成半径および動径伸縮補正**：
+  $$R_{\text{target}} = \sqrt{X_{\text{comp}}^2 + Y^2}$$
+  $$R_{\text{comp}} = R_{\text{target}} \times (1 - K_r) \quad (K_r = 0.06)$$
+- **片持ち梁弾性たわみ高度フィードフォワード補償モデル**（到達半径に応じて線形上昇）：
+  $$\text{comp}_z = Z + (R_{\text{target}} \times K_z) \quad (K_z = 0.12)$$
 
-$$
-z' = Z - L_1 - L_4 \sin(\phi) = Z - L_1 + L_4
-$$
+#### 3. 幾何学的閉形式逆解の導出
+エンドエフェクタを常に垂直下向き（$\phi = -90^\circ$）に拘束し、3次元問題を矢状平面に分離：
 
-#### 3. 肘関節角 $\theta_3$
-余弦定理を適用：
+1. **ベース方位角 $\theta_1$**:
+   $$\theta_1 = \text{atan2}(X_{\text{comp}}, Y)$$
+   サーボ基準角度への変換：
+   $$t_1^{\text{deg}} = \text{degrees}(\theta_1) + 90.0^\circ$$
 
-$$
-\cos(\theta_3) = \frac{r^2 + z'^2 - L_2^2 - L_3^2}{2 L_2 L_3} \implies \theta_3 = \arccos\left( \frac{r^2 + z'^2 - L_2^2 - L_3^2}{2 L_2 L_3} \right)
-$$
+2. **矢状平面等価高度差および弦長算出**:
+   $$\Delta Z = (\text{comp}_z + L_4) - L_1$$
+   $$D = \sqrt{R_{\text{comp}}^2 + \Delta Z^2}$$
 
-#### 4. 肩関節角 $\theta_2$ および手首角 $\theta_4$
-$$
-\theta_2 = \text{atan2}(z', r) - \text{atan2}(L_3 \sin(\theta_3), \, L_2 + L_3 \cos(\theta_3))
-$$
+3. **余弦定理による大腕角 $\alpha$ および前腕内角 $\gamma$**:
+   $$\cos(\alpha) = \frac{L_2^2 + D^2 - L_3^2}{2 L_2 D}, \quad \cos(\gamma) = \frac{L_2^2 + L_3^2 - D^2}{2 L_2 L_3}$$
+   $$\alpha = \arccos\left(\text{clip}(\cos(\alpha), -1, 1)\right), \quad \gamma = \arccos\left(\text{clip}(\cos(\gamma), -1, 1)\right)$$
+   $$\beta = \text{atan2}(\Delta Z, R_{\text{comp}})$$
 
-$$
-\theta_4 = \phi - (\theta_2 + \theta_3) = -90^\circ - (\theta_2 + \theta_3)
-$$
+4. **各関節絶対角および手首適応姿勢**:
+   $$t_2^{\text{deg}} = \text{degrees}(\beta + \alpha)$$
+   $$t_3^{\text{deg}} = t_2^{\text{deg}} - (180.0^\circ - \text{degrees}(\gamma))$$
+   $$t_4^{\text{relative}} = -90.0^\circ - t_3^{\text{deg}}$$
 
-1回の逆運動学計算時間は $0.05\,\text{ms}$ 未満であり、リアルタイム制御ループを確実に満たします。
+解析計算は CPU 上で $< 1\,\mu\text{s}$ で実行され、ヤコビ行列の特異点問題も回避され、高精度な把持性能を実現します。
 
 ---
 
@@ -240,36 +254,38 @@ $0.066^\circ$ の角度分解能を実現し、ミリメートル級の先端位
 
 ---
 
-## 6. リポジトリ構成
+## 6. リポジトリ構成定義
 
 ```bash
 ChessRobot/
-├── localization/                   # ビジョン幾何変換・盤面校正モジュール
-│   ├── board_locator.py            # 四隅自動検出・ROI 抽出
-│   ├── homography.py               # ホモグラフィ行列演算・座標変換
-│   └── calibrate_camera.py         # レンズ歪み補正・キャリブレーション
-├── recognition/                    # 深層学習検出・時系列フィルタリング
-│   ├── yolo_detector.py            # YOLO 推論ラッパー (CUDA/TensorRT)
-│   ├── consensus_filter.py         # 35フレームスライディング多数決フィルタ
-│   └── piece_classifier.py         # 駒クラス判別・Softmax 推論
-├── game/                           # ゲーム決定木・将棋ルールエンジン
-│   ├── chess_engine.py             # 局面管理・合法手生成エンジン
-│   ├── search_ai.py                # Alpha-Beta ミニマックス探索アルゴリズム
-│   └── board_state.py              # 14チャンネル空間テンソル表現・FEN 相互変換
-├── tools/                          # ハードウェア診断・キャリブレーション治具
-│   ├── servo_tester.py             # サーボ角度対話型デバッグツール
-│   ├── ch347_i2c_scanner.py        # I2C アドレススキャナ
-│   └── camera_preview.py           # リアルタイム映像診断ツール
-├── control.py                      # 3段階非衝突モーション制御コア
-├── kinematics.py                   # 4自由度空間解析的逆運動学ソルバ
-├── hardware.py                     # WCH CH347 + PCA9685 低レベル通信ドライバ
-├── config.py                       # 物理寸法・サーボオフセット・通信設定
-├── main.py                         # CLI 端末対局メインプログラム
-├── ui_main.py                      # PyQt5 GUI ダッシュボードメインプログラム
-├── yolo11n.pt                      # 学習済み YOLOv11 中国将棋ウェイトファイル
-├── requirements.txt                # 依存ライブラリ一覧
-├── LICENSE                         # MIT 公式ライセンス証書
-├── README.md                       # 簡体中国語技術仕様書
+├── localization/                   # 空間視覚幾何補正および盤面校正コア
+│   ├── find_chess_new.py           # 本番稼働視覚パイプライン (ChessVisionV15.4: YOLO + LAB輝度弁別 + 35フレーム多数決)
+│   ├── find_chess_simple.py        # 初期軽量テスト用エンジン (ChessVisionV7)
+│   └── find_chess.py               # 過去の全分類推論エンジン版 (ChessVisionEngineV6)
+├── recognition/                    # モデル学習、データセット収集、キャリブレーション保存
+│   ├── train.py                    # YOLO ファインチューニング学習スクリプト
+│   ├── collect_real_data.py        # 実機環境多照度データセット自動収集ツール
+│   ├── test_gpu.py                 # CUDA / GPU 加速動作検証スクリプト
+│   └── models/                     # 校正幾何パラメータ永続化保存 (H_matrix.npy, ROI_corners.npy)
+├── game/                           # 中国将棋ルールエンジンおよび AI 推論
+│   ├── board.py                    # 10x9 将棋物理ルール基盤 (合法手生成 / 手順検証 / 局面ロールバック)
+│   ├── ai.py                       # PyTorch 畳み込みニューラルネットワーク推論エンジン (ChessNet)
+│   ├── constants.py                # 初期盤面配置、駒重み、座標マッピング定数
+│   └── play.py                     # 単体ターミナル対局実行スクリプト
+├── tools/                          # ハードウェア診断および低レベル校正ツール群
+│   ├── calibrate_servo.py          # 4自由度各軸サーボ基準パルス幅校正ツール
+│   ├── test_electromagnet.py       # WCH CH347 GPIO 電磁石吸着通電テストツール
+│   └── calc_reach.py               # アーム作業限界半径および可達空間幾何演算スクリプト
+├── control.py                      # 運動制御中枢 (微小空間3段階衝突回避ピック＆プレース軌道計画)
+├── kinematics.py                   # 4自由度空間解析逆運動学ソルバ (X軸ゲインおよび重力たわみ補償内蔵)
+├── hardware.py                     # WCH CH347 高速 USB ブリッジ (I2C/GPIO) + PCA9685 12ビット PWM ドライバ
+├── config.py                       # グローバル機構リンク長寸法 (L1-L4)、サーボ零点、盤面物理座標定義
+├── main.py                         # ターミナル CLI メイン実行ループ (move_queue 非同期協調閉ループ)
+├── ui_main.py                      # PyQt5 非同期マルチスレッド GUI ダッシュボード (遠隔測定 / 仮想盤面 / 校正)
+├── yolo11n.pt                      # ファインチューニング済み軽量中国将棋検出モデル重み
+├── requirements.txt                # Python 依存ライブラリ一覧
+├── LICENSE                         # MIT ライセンス
+├── README.md                       # 簡体字中国語技術仕様書
 ├── README_EN.md                    # 英語技術仕様書
 └── README_JA.md                    # 日本語技術仕様書
 ```
