@@ -127,54 +127,54 @@
 #### 2. 非线性机械形变与前馈补偿模型 (`kinematics.py`)
 由于开环数码舵机传动齿隙与长力臂在重力作用下的弹性形变，系统引入前馈补偿控制律：
 
-- **X 轴横向几何比例放大前馈**：
+**1. X 轴横向几何比例放大前馈**：
 
-  $$
-  X_{\text{comp}} = X \times K_x \quad (K_x = 1.125)
-  $$
+$$
+X_{\text{comp}} = X \times K_x \quad (K_x = 1.125)
+$$
 
-- **合成工作半径与伸展修正**：
+**2. 合成工作半径与伸展修正**：
 
-  $$
-  R_{\text{target}} = \sqrt{X_{\text{comp}}^2 + Y^2}, \quad R_{\text{comp}} = R_{\text{target}} \times (1 - K_r) \quad (K_r = 0.06)
-  $$
+$$
+R_{\text{target}} = \sqrt{X_{\text{comp}}^2 + Y^2}, \quad R_{\text{comp}} = R_{\text{target}} \times (1 - K_r) \quad (K_r = 0.06)
+$$
 
-- **悬臂自重弹性下垂垂度补偿**：
+**3. 悬臂自重弹性下垂垂度补偿**：
 
-  $$
-  \text{comp}_z = Z + (R_{\text{target}} \times K_z) \quad (K_z = 0.12)
-  $$
+$$
+\text{comp}_z = Z + (R_{\text{target}} \times K_z) \quad (K_z = 0.12)
+$$
 
 #### 3. 几何解析逆运动学求解
 在腕部强制保持垂直向下的约束下，将空间三维运动解耦至俯仰平面求解：
 
-1. **底座回转角**：求解航向角 $\theta_1$ 并映射至舵机基准角 $t_1^{\text{deg}}$：
+**步骤 1：底座回转角**（求解航向角 $\theta_1$ 并映射至舵机基准角 $t_1^{\text{deg}}$）
 
-   $$
-   \theta_1 = \text{atan2}(X_{\text{comp}}, Y), \quad t_1^{\text{deg}} = \text{degrees}(\theta_1) + 90.0^\circ
-   $$
+$$
+\theta_1 = \text{atan2}(X_{\text{comp}}, Y), \quad t_1^{\text{deg}} = \text{degrees}(\theta_1) + 90.0^\circ
+$$
 
-2. **俯仰高度差与连杆弦长**：
+**步骤 2：俯仰高度差与连杆弦长**
 
-   $$
-   \Delta Z = (\text{comp}_z + L_4) - L_1, \quad D = \sqrt{R_{\text{comp}}^2 + \Delta Z^2}
-   $$
+$$
+\Delta Z = (\text{comp}_z + L_4) - L_1, \quad D = \sqrt{R_{\text{comp}}^2 + \Delta Z^2}
+$$
 
-3. **余弦定理求大臂内角** $\alpha$ **与小臂内角** $\gamma$ ：
+**步骤 3：余弦定理求大臂内角** $\alpha$ **与小臂内角** $\gamma$
 
-   $$
-   \cos(\alpha) = \frac{L_2^2 + D^2 - L_3^2}{2 L_2 D}, \quad \cos(\gamma) = \frac{L_2^2 + L_3^2 - D^2}{2 L_2 L_3}
-   $$
+$$
+\cos(\alpha) = \frac{L_2^2 + D^2 - L_3^2}{2 L_2 D}, \quad \cos(\gamma) = \frac{L_2^2 + L_3^2 - D^2}{2 L_2 L_3}
+$$
 
-4. **关节角求解**：
+**步骤 4：关节角求解**
 
-   $$
-   \beta = \text{atan2}(\Delta Z, R_{\text{comp}})
-   $$
+$$
+\beta = \text{atan2}(\Delta Z, R_{\text{comp}})
+$$
 
-   $$
-   t_2^{\text{deg}} = \text{degrees}(\beta + \alpha), \quad t_3^{\text{deg}} = t_2^{\text{deg}} - (180.0^\circ - \text{degrees}(\gamma)), \quad t_4^{\text{relative}} = -90.0^\circ - t_3^{\text{deg}}
-   $$
+$$
+t_2^{\text{deg}} = \text{degrees}(\beta + \alpha), \quad t_3^{\text{deg}} = t_2^{\text{deg}} - (180.0^\circ - \text{degrees}(\gamma)), \quad t_4^{\text{relative}} = -90.0^\circ - t_3^{\text{deg}}
+$$
 
 #### 4. 微距五阶段防刮蹭轨迹规划 (`control.py`)
 为防止吸盘斜向运动碰倒相邻紧密排列的棋子，运动轨迹严格规划为五阶段航路点：

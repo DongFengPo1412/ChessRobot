@@ -127,54 +127,54 @@
 #### 2. 非線形フィードフォワード補償モデル (`kinematics.py`)
 長アーム自重による弾性たわみと開ループサーボのバックラッシュを補償する制御則を導入：
 
-- **X 軸横方向幾何ゲイン補償**：
+**1. X 軸横方向幾何ゲイン補償**：
 
-  $$
-  X_{	ext{comp}} = X 	imes K_x \quad (K_x = 1.125)
-  $$
+$$
+X_{\text{comp}} = X \times K_x \quad (K_x = 1.125)
+$$
 
-- **合成作業半径・伸長補正**：
+**2. 合成作業半径・伸長補正**：
 
-  $$
-  R_{	ext{target}} = \sqrt{X_{	ext{comp}}^2 + Y^2}, \quad R_{	ext{comp}} = R_{	ext{target}} 	imes (1 - K_r) \quad (K_r = 0.06)
-  $$
+$$
+R_{\text{target}} = \sqrt{X_{\text{comp}}^2 + Y^2}, \quad R_{\text{comp}} = R_{\text{target}} \times (1 - K_r) \quad (K_r = 0.06)
+$$
 
-- **自重たわみ高さフィードフォワード補償**：
+**3. 自重たわみ高さフィードフォワード補償**：
 
-  $$
-  	ext{comp}_z = Z + (R_{	ext{target}} 	imes K_z) \quad (K_z = 0.12)
-  $$
+$$
+\text{comp}_z = Z + (R_{\text{target}} \times K_z) \quad (K_z = 0.12)
+$$
 
 #### 3. 幾何学的解析逆運動学（IK）の求解
 手首垂直拘束のもと、空間3次元問題をピッチ平面へ幾何学的に分解して閉形式で求解：
 
-1. **ベース旋回角**：方位角 $	heta_1$ を求めてサーボ目標角 $t_1^{	ext{deg}}$ へ換算：
+**ステップ 1：ベース旋回角**（方位角 $\theta_1$ を求めてサーボ目標角 $t_1^{\text{deg}}$ へ換算）
 
-   $$
-   	heta_1 = 	ext{atan2}(X_{	ext{comp}}, Y), \quad t_1^{	ext{deg}} = 	ext{degrees}(	heta_1) + 90.0^\circ
-   $$
+$$
+\theta_1 = \text{atan2}(X_{\text{comp}}, Y), \quad t_1^{\text{deg}} = \text{degrees}(\theta_1) + 90.0^\circ
+$$
 
-2. **ピッチ高度差と弦長**：
+**ステップ 2：ピッチ高度差と弦長**
 
-   $$
-   \Delta Z = (	ext{comp}_z + L_4) - L_1, \quad D = \sqrt{R_{	ext{comp}}^2 + \Delta Z^2}
-   $$
+$$
+\Delta Z = (\text{comp}_z + L_4) - L_1, \quad D = \sqrt{R_{\text{comp}}^2 + \Delta Z^2}
+$$
 
-3. **余弦定理による関節内角の算出**：
+**ステップ 3：余弦定理による関節内角の算出**
 
-   $$
-   \cos(lpha) = rac{L_2^2 + D^2 - L_3^2}{2 L_2 D}, \quad \cos(\gamma) = rac{L_2^2 + L_3^2 - D^2}{2 L_2 L_3}
-   $$
+$$
+\cos(\alpha) = \frac{L_2^2 + D^2 - L_3^2}{2 L_2 D}, \quad \cos(\gamma) = \frac{L_2^2 + L_3^2 - D^2}{2 L_2 L_3}
+$$
 
-4. **各軸目標角の算出**：
+**ステップ 4：各軸目標角の算出**
 
-   $$
-   eta = 	ext{atan2}(\Delta Z, R_{	ext{comp}})
-   $$
+$$
+\beta = \text{atan2}(\Delta Z, R_{\text{comp}})
+$$
 
-   $$
-   t_2^{	ext{deg}} = 	ext{degrees}(eta + lpha), \quad t_3^{	ext{deg}} = t_2^{	ext{deg}} - (180.0^\circ - 	ext{degrees}(\gamma)), \quad t_4^{	ext{relative}} = -90.0^\circ - t_3^{	ext{deg}}
-   $$
+$$
+t_2^{\text{deg}} = \text{degrees}(\beta + lpha), \quad t_3^{\text{deg}} = t_2^{\text{deg}} - (180.0^\circ - \text{degrees}(\gamma)), \quad t_4^{\text{relative}} = -90.0^\circ - t_3^{\text{deg}}
+$$
 
 #### 4. 微小空間5段階衝突回避ピック＆プレース軌道計画 (`control.py`)
 密集配置された隣接駒への接触転倒を防ぐため、厳格な5段階ウェイポイント軌道を生成：

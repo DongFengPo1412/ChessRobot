@@ -127,54 +127,54 @@ The manipulator features a 4-DOF articulated design: Base Yaw (J1), Shoulder Pit
 #### 2. Non-Linear Kinematic Feedforward Compensation (`kinematics.py`)
 To counteract cantilever gravitational deflection and gear backlash from open-loop digital servos:
 
-- **X-Axis Lateral Scaling Feedforward**:
+**1. X-Axis Lateral Scaling Feedforward**:
 
-  $$
-  X_{\text{comp}} = X \times K_x \quad (K_x = 1.125)
-  $$
+$$
+X_{\text{comp}} = X \times K_x \quad (K_x = 1.125)
+$$
 
-- **Synthesized Working Radius Adjustment**:
+**2. Synthesized Working Radius Adjustment**:
 
-  $$
-  R_{\text{target}} = \sqrt{X_{\text{comp}}^2 + Y^2}, \quad R_{\text{comp}} = R_{\text{target}} \times (1 - K_r) \quad (K_r = 0.06)
-  $$
+$$
+R_{\text{target}} = \sqrt{X_{\text{comp}}^2 + Y^2}, \quad R_{\text{comp}} = R_{\text{target}} \times (1 - K_r) \quad (K_r = 0.06)
+$$
 
-- **Cantilever Sag Elevation Feedforward**:
+**3. Cantilever Sag Elevation Feedforward**:
 
-  $$
-  \text{comp}_z = Z + (R_{\text{target}} \times K_z) \quad (K_z = 0.12)
-  $$
+$$
+\text{comp}_z = Z + (R_{\text{target}} \times K_z) \quad (K_z = 0.12)
+$$
 
 #### 3. Analytical Geometric Inverse Kinematics
 Enforcing end-effector vertical constraint decodes 3D coordinates into planar pitch equations:
 
-1. **Base Azimuth**: Solve base heading angle $\theta_1$ and map to servo angle $t_1^{\text{deg}}$:
+**Step 1: Base Azimuth** (Solve base heading angle $\theta_1$ and map to servo angle $t_1^{\text{deg}}$)
 
-   $$
-   \theta_1 = \text{atan2}(X_{\text{comp}}, Y), \quad t_1^{\text{deg}} = \text{degrees}(\theta_1) + 90.0^\circ
-   $$
+$$
+\theta_1 = \text{atan2}(X_{\text{comp}}, Y), \quad t_1^{\text{deg}} = \text{degrees}(\theta_1) + 90.0^\circ
+$$
 
-2. **Elevation Delta & Link Chord**:
+**Step 2: Elevation Delta & Link Chord**
 
-   $$
-   \Delta Z = (\text{comp}_z + L_4) - L_1, \quad D = \sqrt{R_{\text{comp}}^2 + \Delta Z^2}
-   $$
+$$
+\Delta Z = (\text{comp}_z + L_4) - L_1, \quad D = \sqrt{R_{\text{comp}}^2 + \Delta Z^2}
+$$
 
-3. **Law of Cosines for Shoulder Angle** $\alpha$ **& Elbow Angle** $\gamma$ :
+**Step 3: Law of Cosines for Shoulder Angle** $\alpha$ **& Elbow Angle** $\gamma$
 
-   $$
-   \cos(\alpha) = \frac{L_2^2 + D^2 - L_3^2}{2 L_2 D}, \quad \cos(\gamma) = \frac{L_2^2 + L_3^2 - D^2}{2 L_2 L_3}
-   $$
+$$
+\cos(\alpha) = \frac{L_2^2 + D^2 - L_3^2}{2 L_2 D}, \quad \cos(\gamma) = \frac{L_2^2 + L_3^2 - D^2}{2 L_2 L_3}
+$$
 
-4. **Joint Angles**:
+**Step 4: Joint Angles**
 
-   $$
-   \beta = \text{atan2}(\Delta Z, R_{\text{comp}})
-   $$
+$$
+\beta = \text{atan2}(\Delta Z, R_{\text{comp}})
+$$
 
-   $$
-   t_2^{\text{deg}} = \text{degrees}(\beta + \alpha), \quad t_3^{\text{deg}} = t_2^{\text{deg}} - (180.0^\circ - \text{degrees}(\gamma)), \quad t_4^{\text{relative}} = -90.0^\circ - t_3^{\text{deg}}
-   $$
+$$
+t_2^{\text{deg}} = \text{degrees}(\beta + \alpha), \quad t_3^{\text{deg}} = t_2^{\text{deg}} - (180.0^\circ - \text{degrees}(\gamma)), \quad t_4^{\text{relative}} = -90.0^\circ - t_3^{\text{deg}}
+$$
 
 #### 4. Micro-Space 5-Phase Collision-Free Trajectory Planning (`control.py`)
 To prevent the suction head from colliding with tightly spaced neighbor pieces:
