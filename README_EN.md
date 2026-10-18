@@ -299,13 +299,13 @@ ChessRobot/
 │   └── models/                     # Calibration matrices & weights persistence (best.pt, H_matrix.npy, ROI_corners.npy)
 ├── game/                           # Chinese Chess rule engine & AI decision
 │   ├── board.py                    # 10x9 complete chess rule base (legal move generator / state rollback)
-│   ├── ai.py                       # PyTorch Convolutional Neural Network evaluation engine (ChessNet, 14-channel input / 8100-dim action space)
+│   ├── ai.py                       # PyTorch CNN evaluation & move decision engine (ChessNet, 14-ch in / 8100-dim out; falls back to random legal move if aaa.pth missing)
 │   ├── constants.py                # Initial board setups, piece weights & coordinate mappings
 │   └── play.py                     # Standalone terminal game loop test runner
 ├── tools/                          # Low-level hardware diagnostic & calibration suite
 │   ├── calibrate_servo.py          # 4-DOF joint microsecond reference pulse calibration tool (Channels 0, 4, 8, 12)
 │   ├── test_electromagnet.py       # WCH CH347 native GPIO2 (DTR0) electromagnet actuation test script
-│   └── calc_reach.py               # Arm operational workspace & reachability validation utility
+│   └── calc_reach.py               # Arm maximum reach envelope & theoretical workspace boundary verification script
 ├── control.py                      # Manipulator motion controller (5-phase collision-free trajectory planner)
 ├── kinematics.py                   # 4-DOF analytical IK solver (with X-axis scaling & cantilever droop feedforward)
 ├── hardware.py                     # WCH CH347 high-speed USB bridge (100kHz I2C + GPIO2) + PCA9685 12-bit PWM driver

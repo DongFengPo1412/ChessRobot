@@ -297,13 +297,13 @@ ChessRobot/
 │   └── models/                     # 校正幾何パラメータおよび重み永続化保存 (best.pt, H_matrix.npy, ROI_corners.npy)
 ├── game/                           # 中国将棋ルールエンジンおよび AI 推論
 │   ├── board.py                    # 10x9 将棋物理ルール基盤 (合法手生成 / 手順検証 / 局面ロールバック)
-│   ├── ai.py                       # PyTorch 畳み込みニューラルネットワーク推論エンジン (ChessNet, 14ch入力/8100次元出力)
+│   ├── ai.py                       # PyTorch 畳み込みニューラルネットワーク推論エンジン (ChessNet, 14ch入力/8100次元出力；aaa.pth 未配置時は合法手のランダム選択へ降格)
 │   ├── constants.py                # 初期盤面配置、駒重み、座標マッピング定数
 │   └── play.py                     # 単体ターミナル対局実行スクリプト
 ├── tools/                          # ハードウェア診断および低レベル校正ツール群
 │   ├── calibrate_servo.py          # 4自由度各軸サーボ基準パルス幅校正ツール (ch 0, 4, 8, 12)
 │   ├── test_electromagnet.py       # WCH CH347 ネイティブ GPIO2 (DTR0) 電磁石吸着テストツール
-│   └── calc_reach.py               # アーム作業限界半径および可達空間幾何演算スクリプト
+│   └── calc_reach.py               # アーム作業限界半径および理論可達空間幾何演算スクリプト
 ├── control.py                      # 運動制御中枢 (微小空間5段階衝突回避ピック＆プレース軌道計画)
 ├── kinematics.py                   # 4自由度空間解析逆運動学ソルバ (X軸ゲインおよび重力たわみ補償内蔵)
 ├── hardware.py                     # WCH CH347 高速 USB ブリッジ (100kHz I2C + GPIO2) + PCA9685 12ビット PWM ドライバ
