@@ -96,7 +96,7 @@
 
 </div>
 
-### 3.2 実機対局ハイビジョン原図と操作画面
+### 3.2 実機対局ハイビジョン記録写真
 
 <div align="center">
 
@@ -104,11 +104,6 @@
 | :---: | :---: |
 | <img src="docs/images/demo_live_arm_pickup.jpg" width="420px" alt="実機吸着"/> | <img src="docs/images/demo_live_arm_place.jpg" width="420px" alt="実機着手"/> |
 
-</div>
-
-<div align="center">
-  <img src="docs/images/demo_ui_console.png" width="880px" alt="PyQt5 ダッシュボード"/>
-  <p><b>PyQt5 非同期操作ダッシュボード（リアルタイム映像、仮想盤面、着手ログ、4点キャリブレーション）</b></p>
 </div>
 
 ---
@@ -137,7 +132,7 @@
 
 #### 3. 幾何学的解析逆運動学（IK）の求解
 手首垂直拘束のもと、空間3次元問題をピッチ平面へ幾何学的に分解して閉形式で求解：
-1. **ベース旋回角**：$\theta_1 = \operatorname{atan2}(X_{\text{comp}}, Y)$、サーボ角へ換算 $t_1^{\text{deg}} = \operatorname{degrees}(\theta_1) + 90.0^\circ$；
+1. **ベース旋回角**：$\theta_1 = \text{atan2}(X_{\text{comp}}, Y)$、サーボ角へ換算 $t_1^{\text{deg}} = \text{degrees}(\theta_1) + 90.0^\circ$；
 2. **ピッチ高度差と弦長**：$\Delta Z = (\text{comp}_z + L_4) - L_1$、$D = \sqrt{R_{\text{comp}}^2 + \Delta Z^2}$；
 3. **余弦定理による関節内角の算出**：
 
@@ -145,7 +140,7 @@ $$
 \cos(\alpha) = \frac{L_2^2 + D^2 - L_3^2}{2 L_2 D}, \quad \cos(\gamma) = \frac{L_2^2 + L_3^2 - D^2}{2 L_2 L_3}
 $$
 
-4. **各軸目標角の算出**：$\beta = \operatorname{atan2}(\Delta Z, R_{\text{comp}})$、第1アーム角 $t_2^{\text{deg}} = \operatorname{degrees}(\beta + \alpha)$、第2アーム角 $t_3^{\text{deg}} = t_2^{\text{deg}} - (180.0^\circ - \operatorname{degrees}(\gamma))$、手首相対角 $t_4^{\text{relative}} = -90.0^\circ - t_3^{\text{deg}}$。
+4. **各軸目標角の算出**：$\beta = \text{atan2}(\Delta Z, R_{\text{comp}})$、第1アーム角 $t_2^{\text{deg}} = \text{degrees}(\beta + \alpha)$、第2アーム角 $t_3^{\text{deg}} = t_2^{\text{deg}} - (180.0^\circ - \text{degrees}(\gamma))$、手首相対角 $t_4^{\text{relative}} = -90.0^\circ - t_3^{\text{deg}}$。
 
 #### 4. 微小空間5段階衝突回避ピック＆プレース軌道計画 (`control.py`)
 密集配置された隣接駒への接触転倒を防ぐため、厳格な5段階ウェイポイント軌道を生成：
@@ -176,6 +171,11 @@ $$
   - 物体検出率は飛躍的に向上し、ハフ円の誤検出問題は解消；
   - **透視歪みによる文字混同**：広角レンズ周辺部での幾何学的圧縮により、遠方の小さな文字細部が潰れ、酷似した文字（**「車」と「卒」、「馬」と「兵」**）の混同が多発。将棋対局では1文字の誤認識が致命的となるため、対局エンジンが破綻。
 
+<div align="center">
+  <img src="docs/images/vision_pipeline_evolution.png" width="820px" alt="Roboflow データセットアノテーション画面"/>
+  <p><b>第2世代視覚開発記録：Roboflow 上で実写中国将棋対局データセットを1枚ずつアノテーション（全620枚、14クラスの駒を矩形アノテーション）</b></p>
+</div>
+
 #### 第3世代本番システム (Gen 3: 戦略的工学的妥協 —— YOLO位置検出 ＋ 紅黒2値分類)
 - **タスクの戦略的次元削減**：
   - 納期と物理的文字識別の限界を直視し、英断を下す：14クラスの微細な文字分類を断念し、YOLO のタスクを**「駒の位置検出 ＋ 紅黒2値陣営分類」**へ大胆に次元削減；
@@ -190,6 +190,11 @@ $$
   - **4隅キーポイント自動補正**：OpenMMLab MMPose 姿勢推定モデルにより盤面の4隅を全自動検出し、手動クリックなしに標準俯瞰図へ自動透視変換；
   - **Swin-Transformer 2 特徴テンソル出力**：局所バウンディングボックスの概念を完全撤廃；Swin-Transformer 2 が直接 $10 \times 9 \times 16$ の空間テンソルを出力し、盤上90個の全交差点に対して一括16分類（空位 / その他 / 紅黒14駒）を実行；
   - **究極のブレークスルー**：**残局や任意の途中配置盤面を瞬時に完全認識可能**；格子の状態変化を直接捉えるため**駒取り時のカウント死に完全に耐性**を持ち、人間による確認ボタンを完全撤廃した、真の100%全自動クローズドループを実現！
+
+<div align="center">
+  <img src="docs/images/vision_real_experiments.png" width="820px" alt="ホモグラフィ透視変換と 10x9 大域グリッド推論画面"/>
+  <p><b>第4世代視覚実機テスト画面：盤面ホモグラフィ透視変換補正（左側 Step 2 盤面伸張）と 10×9 大域グリッド状態認識推論結果（右側 推論時間 0.54s、盤面全自動デジタルマッピング）</b></p>
+</div>
 
 ---
 

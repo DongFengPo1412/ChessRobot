@@ -96,7 +96,7 @@
 
 </div>
 
-### 3.2 实机对弈实录原图与控制台界面
+### 3.2 实机对弈高清实录原图
 
 <div align="center">
 
@@ -104,11 +104,6 @@
 | :---: | :---: |
 | <img src="docs/images/demo_live_arm_pickup.jpg" width="420px" alt="实机吸取棋子"/> | <img src="docs/images/demo_live_arm_place.jpg" width="420px" alt="实机精准落子"/> |
 
-</div>
-
-<div align="center">
-  <img src="docs/images/demo_ui_console.png" width="880px" alt="PyQt5 人机交互控制台"/>
-  <p><b>PyQt5 多线程控制台仪表盘（包含实时视频、虚拟数字棋盘、单步通信日志与四点标定功能）</b></p>
 </div>
 
 ---
@@ -137,7 +132,7 @@
 
 #### 3. 几何解析逆运动学求解
 在腕部强制保持垂直向下的约束下，将空间三维运动解耦至俯仰平面求解：
-1. **底座回转角**：$\theta_1 = \operatorname{atan2}(X_{\text{comp}}, Y)$，转换为舵机基准角 $t_1^{\text{deg}} = \operatorname{degrees}(\theta_1) + 90.0^\circ$；
+1. **底座回转角**：$\theta_1 = \text{atan2}(X_{\text{comp}}, Y)$，转换为舵机基准角 $t_1^{\text{deg}} = \text{degrees}(\theta_1) + 90.0^\circ$；
 2. **俯仰高度差与连杆弦长**：$\Delta Z = (\text{comp}_z + L_4) - L_1$，$D = \sqrt{R_{\text{comp}}^2 + \Delta Z^2}$；
 3. **余弦定理求大臂内角 $\alpha$ 与小臂内角 $\gamma$**：
 
@@ -145,7 +140,7 @@ $$
 \cos(\alpha) = \frac{L_2^2 + D^2 - L_3^2}{2 L_2 D}, \quad \cos(\gamma) = \frac{L_2^2 + L_3^2 - D^2}{2 L_2 L_3}
 $$
 
-4. **关节角求解**：$\beta = \operatorname{atan2}(\Delta Z, R_{\text{comp}})$，大臂角度 $t_2^{\text{deg}} = \operatorname{degrees}(\beta + \alpha)$，小臂角度 $t_3^{\text{deg}} = t_2^{\text{deg}} - (180.0^\circ - \operatorname{degrees}(\gamma))$，腕部相对角 $t_4^{\text{relative}} = -90.0^\circ - t_3^{\text{deg}}$。
+4. **关节角求解**：$\beta = \text{atan2}(\Delta Z, R_{\text{comp}})$，大臂角度 $t_2^{\text{deg}} = \text{degrees}(\beta + \alpha)$，小臂角度 $t_3^{\text{deg}} = t_2^{\text{deg}} - (180.0^\circ - \text{degrees}(\gamma))$，腕部相对角 $t_4^{\text{relative}} = -90.0^\circ - t_3^{\text{deg}}$。
 
 #### 4. 微距五阶段防刮蹭轨迹规划 (`control.py`)
 为防止吸盘斜向运动碰倒相邻紧密排列的棋子，运动轨迹严格规划为五阶段航路点：
@@ -176,6 +171,11 @@ $$
   - 目标检出率大幅跃升，彻底杜绝了霍夫圆漏检假圆的问题；
   - **透视压缩极限混淆**：广角镜头边缘存在透视几何压缩，远端小尺寸棋子的笔画细节丢失，极为相似的汉字（如**“車”与“卒”、“馬”与“兵”**）混淆严重。对弈系统对单兵种分类容错率为零，错识别一个字即可导致全局决策崩溃。
 
+<div align="center">
+  <img src="docs/images/vision_pipeline_evolution.png" width="820px" alt="Roboflow 棋盘数据集标注工作区"/>
+  <p><b>第二代视觉研发实录：在 Roboflow 平台上逐张标注真实中国象棋对弈数据集（共 620 张图像，人工标注 14 类棋子兵种目标框）</b></p>
+</div>
+
 #### 第三代实战 (Gen 3: 战略性降维 —— YOLO 定位 + 红黑阵营二分类)
 - **工程减法与降维抉择**：
   - 面对工期压力与 14 类文字在远端识别的客观物理瓶颈，做出果断取舍：放弃复杂的 14 类字形细分识别，将 YOLO 任务降维为**“棋子位置检测 + 红黑阵营二分类”**；
@@ -190,6 +190,11 @@ $$
   - **四角点自动透视校正**：采用 OpenMMLab MMPose 关键点检测网络自动捕捉棋盘四个物理基准角点，无需人工手动选点标定，自动拉伸变换为无畸变俯视图；
   - **Swin-Transformer 2 特征张量输出**：彻底抛弃局部单框检测逻辑，采用 Swin-Transformer 2 特征网络直接输出 $10 \times 9 \times 16$ 空间矩阵张量，一次性对棋盘全部 90 个交叉点完成 16 分类（空位 / 其它 / 红黑 14 兵种）；
   - **终极突破**：**彻底攻克残局与任意局面摆盘识别**；格子状态变更即刻捕获，**天然免疫吃子计数死锁**，完全免除人机确认按钮，实现真正的 100% 全自主感知闭环！
+
+<div align="center">
+  <img src="docs/images/vision_real_experiments.png" width="820px" alt="透视变换拉伸矫正与 10x9 全局网格推理界面"/>
+  <p><b>第四代视觉实测界面：棋盘透视变换矫正（左侧 Step 2 拉伸棋盘）与 10×9 全盘网格状态识别推理结果（右侧单帧推理耗时 0.54s，实现全自动阵面数字化映射）</b></p>
+</div>
 
 ---
 

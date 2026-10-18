@@ -96,7 +96,7 @@ The complete 2K 60fps autonomous closed-loop gameplay demonstration video is pub
 
 </div>
 
-### 3.2 Authentic Live Match Capture & GUI Dashboard
+### 3.2 Authentic Live Match Capture Snapshots
 
 <div align="center">
 
@@ -104,11 +104,6 @@ The complete 2K 60fps autonomous closed-loop gameplay demonstration video is pub
 | :---: | :---: |
 | <img src="docs/images/demo_live_arm_pickup.jpg" width="420px" alt="Electromagnetic Pickup"/> | <img src="docs/images/demo_live_arm_place.jpg" width="420px" alt="Precision Release"/> |
 
-</div>
-
-<div align="center">
-  <img src="docs/images/demo_ui_console.png" width="880px" alt="PyQt5 Operator Dashboard"/>
-  <p><b>PyQt5 Multithreaded Telemetry Dashboard (Live Video, Virtual Board, Telemetry Log & 4-Point Calibration)</b></p>
 </div>
 
 ---
@@ -137,7 +132,7 @@ To counteract cantilever gravitational deflection and gear backlash from open-lo
 
 #### 3. Analytical Geometric Inverse Kinematics
 Enforcing end-effector vertical constraint decodes 3D coordinates into planar pitch equations:
-1. **Base Azimuth**: $\theta_1 = \operatorname{atan2}(X_{\text{comp}}, Y)$, mapped to servo angle $t_1^{\text{deg}} = \operatorname{degrees}(\theta_1) + 90.0^\circ$;
+1. **Base Azimuth**: $\theta_1 = \text{atan2}(X_{\text{comp}}, Y)$, mapped to servo angle $t_1^{\text{deg}} = \text{degrees}(\theta_1) + 90.0^\circ$;
 2. **Elevation Delta & Link Chord**: $\Delta Z = (\text{comp}_z + L_4) - L_1$, $D = \sqrt{R_{\text{comp}}^2 + \Delta Z^2}$;
 3. **Law of Cosines for Shoulder Angle $\alpha$ & Elbow Angle $\gamma$**:
 
@@ -145,7 +140,7 @@ $$
 \cos(\alpha) = \frac{L_2^2 + D^2 - L_3^2}{2 L_2 D}, \quad \cos(\gamma) = \frac{L_2^2 + L_3^2 - D^2}{2 L_2 L_3}
 $$
 
-4. **Joint Angles**: $\beta = \operatorname{atan2}(\Delta Z, R_{\text{comp}})$, Shoulder angle $t_2^{\text{deg}} = \operatorname{degrees}(\beta + \alpha)$, Elbow angle $t_3^{\text{deg}} = t_2^{\text{deg}} - (180.0^\circ - \operatorname{degrees}(\gamma))$, Wrist angle $t_4^{\text{relative}} = -90.0^\circ - t_3^{\text{deg}}$.
+4. **Joint Angles**: $\beta = \text{atan2}(\Delta Z, R_{\text{comp}})$, Shoulder angle $t_2^{\text{deg}} = \text{degrees}(\beta + \alpha)$, Elbow angle $t_3^{\text{deg}} = t_2^{\text{deg}} - (180.0^\circ - \text{degrees}(\gamma))$, Wrist angle $t_4^{\text{relative}} = -90.0^\circ - t_3^{\text{deg}}$.
 
 #### 4. Micro-Space 5-Phase Collision-Free Trajectory Planning (`control.py`)
 To prevent the suction head from colliding with tightly spaced neighbor pieces:
@@ -176,6 +171,11 @@ Liu Chaoran independently spearheaded 100% of dataset collection, annotation, an
   - Localization jumped dramatically, eliminating false circles;
   - **Perspective Compression Confusion**: Wide-angle lens distortion degraded small characters at board edges, causing severe confusion between similar characters (e.g., **Chariot 車 vs. Pawn 卒**, **Horse 馬 vs. Soldier 兵**). With 0% error tolerance, a single misclassification collapsed gameplay.
 
+<div align="center">
+  <img src="docs/images/vision_pipeline_evolution.png" width="820px" alt="Roboflow Chessboard Annotation Workspace"/>
+  <p><b>Gen 2 Vision Development: Annotating authentic Chinese chess board images on Roboflow (620 images, manually labeled 14 piece classes)</b></p>
+</div>
+
 #### Generation 3: Strategic Engineering Downscaling (YOLO Detection + Red/Black Binary Classification)
 - **Downscaling Strategy**:
   - Faced with deadlines and physical font recognition bottlenecks, made a decisive engineering trade-off: abandon 14-class character recognition, downscaling YOLO to **piece localization + red/black team binary classification**;
@@ -190,6 +190,11 @@ Liu Chaoran independently spearheaded 100% of dataset collection, annotation, an
   - **MMPose 4-Corner Rectification**: OpenMMLab MMPose keypoint model detects 4 board corners automatically, rectifying the perspective without manual clicking;
   - **Swin-Transformer 2 Spatial Tensor Output**: Bypasses local bounding boxes; Swin-Transformer 2 outputs a $10 \times 9 \times 16$ spatial tensor, simultaneously classifying all 90 grid intersections into 16 categories (empty / other / 14 red-black pieces);
   - **Breakthrough**: **Fully supports arbitrary mid-game and endgame setups**; naturally immune to capture count drops; removes the confirmation button for 100% autonomous gameplay!
+
+<div align="center">
+  <img src="docs/images/vision_real_experiments.png" width="820px" alt="Homography Rectification & 10x9 Grid Inference Interface"/>
+  <p><b>Gen 4 Vision Experimental Interface: Homography perspective rectification (Left: Step 2 Rectified Board) and 10×9 global grid recognition inference (Right: 0.54s latency, fully autonomous board digitizing)</b></p>
+</div>
 
 ---
 
