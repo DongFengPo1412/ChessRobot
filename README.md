@@ -73,7 +73,7 @@
 | 成员 | 团队工程角色 | 核心研发模块与技术落地 |
 | :--- | :--- | :--- |
 | **田峻硕 (Tian Junshuo)** | **团队组长 / 机械与运动控制负责人** | <ul><li>负责四自由度机械臂硬件结构装配、舵机选型与各关节调试；</li><li>负责 WCH CH347 USB 桥接与 PCA9685 12-bit PWM 底层驱动实现（`hardware.py`）；</li><li>推导空间几何解析逆运动学（Analytical IK）闭式解（`kinematics.py`）；</li><li>设计微距空间五阶段防刮蹭无碰撞抓放轨迹规划控制律（`control.py`）。</li></ul> |
-| **刘超然 (Liu Chaoran)** | **视觉感知负责人** | <ul><li><b>独立完成视觉系统所有真实图像数据集的采集、清洗与手工标注工作</b>；</li><li>主导视觉系统的四代技术演进，研发轻量级 YOLO 棋子定位与红黑阵营分类模型；</li><li>实现基于 OpenCV 单应性矩阵（$3 \times 3$ Homography）的四点透视标定与坐标映射（`localization/find_chess_new.py`）；</li><li>开发 PyQt5 异步多线程人机交互控制台（`ui_main.py`）；</li><li><b>辅助参与机械臂运动控制参数的工程调试</b>（包括悬臂重力下垂的高度补偿参数调谐等）。</li></ul> |
+| **刘超然 (Liu Chaoran)** | **视觉感知负责人** | <ul><li><b>独立完成视觉系统所有真实图像数据集的采集、清洗与手工标注工作</b>；</li><li>主导视觉系统的四代技术演进，研发轻量级 YOLO 棋子定位与红黑阵营分类模型；</li><li>实现基于 OpenCV 单应性矩阵（ $3 \times 3$ Homography ）的四点透视标定与坐标映射（`localization/find_chess_new.py`）；</li><li>开发 PyQt5 异步多线程人机交互控制台（`ui_main.py`）；</li><li><b>辅助参与机械臂运动控制参数的工程调试</b>（包括悬臂重力下垂的高度补偿参数调谐等）。</li></ul> |
 | **张子琛 (Zhang Zichen)** | **博弈决策与规则引擎负责人** | <ul><li>负责中国象棋 10x9 完整棋盘走法规则引擎构建与历史回滚机制（`game/board.py`）；</li><li>研发基于 PyTorch 深度卷积神经网络（`ChessNet`，14通道输入/8100维输出）的局面评估与走子决策模型（`game/ai.py`）；</li><li>定义棋盘网格空间坐标映射与标准初始棋局常量（`game/constants.py`）。</li></ul> |
 | **邢艺龙 (Xing Yilong)** | **系统集成与工装搭建** | <ul><li>负责硬件电气配线、电源稳压模块搭建与接线规范管理；</li><li>制作定制导磁棋盘、手工粘贴导磁铁片棋子与电磁铁末端夹具装配；</li><li>搭建多轴硬件测试台架，辅助开展多轴联合调试与动作可靠性验证（`tools/`）。</li></ul> |
 
@@ -119,35 +119,69 @@
 机械臂采用四自由度关节型串联构型：底座水平回转关节（J1）、大臂俯仰关节（J2）、小臂俯仰关节（J3）与腕部姿态保持关节（J4），末端挂载微型电磁铁吸盘（强制保持垂直向下 $\phi = -90^\circ$）。
 
 #### 1. 物理连杆几何参数 (`config.py`)
-- 底座回转中心高：$L_1 = 73.0\,\text{mm}$
-- 大臂有效连杆长：$L_2 = 231.0\,\text{mm}$
-- 小臂有效连杆长：$L_3 = 231.0\,\text{mm}$
-- 腕部关节至吸盘端长：$L_4 = 66.0\,\text{mm}$
+- 底座回转中心高： $L_1 = 73.0\,\text{mm}$
+- 大臂有效连杆长： $L_2 = 231.0\,\text{mm}$
+- 小臂有效连杆长： $L_3 = 231.0\,\text{mm}$
+- 腕部关节至吸盘端长： $L_4 = 66.0\,\text{mm}$
 
 #### 2. 非线性机械形变与前馈补偿模型 (`kinematics.py`)
 由于开环数码舵机传动齿隙与长力臂在重力作用下的弹性形变，系统引入前馈补偿控制律：
-- **X 轴横向几何比例放大前馈**：$X_{\text{comp}} = X \times K_x \quad (K_x = 1.125)$
-- **合成工作半径与伸展修正**：$R_{\text{target}} = \sqrt{X_{\text{comp}}^2 + Y^2}$，$R_{\text{comp}} = R_{\text{target}} \times (1 - K_r) \quad (K_r = 0.06)$
-- **悬臂自重弹性下垂垂度补偿**：$\text{comp}_z = Z + (R_{\text{target}} \times K_z) \quad (K_z = 0.12)$
+
+- **X 轴横向几何比例放大前馈**：
+
+  $$
+  X_{\text{comp}} = X \times K_x \quad (K_x = 1.125)
+  $$
+
+- **合成工作半径与伸展修正**：
+
+  $$
+  R_{\text{target}} = \sqrt{X_{\text{comp}}^2 + Y^2}, \quad R_{\text{comp}} = R_{\text{target}} \times (1 - K_r) \quad (K_r = 0.06)
+  $$
+
+- **悬臂自重弹性下垂垂度补偿**：
+
+  $$
+  \text{comp}_z = Z + (R_{\text{target}} \times K_z) \quad (K_z = 0.12)
+  $$
 
 #### 3. 几何解析逆运动学求解
 在腕部强制保持垂直向下的约束下，将空间三维运动解耦至俯仰平面求解：
-1. **底座回转角**：$\theta_1 = \text{atan2}(X_{\text{comp}}, Y)$，转换为舵机基准角 $t_1^{\text{deg}} = \text{degrees}(\theta_1) + 90.0^\circ$；
-2. **俯仰高度差与连杆弦长**：$\Delta Z = (\text{comp}_z + L_4) - L_1$，$D = \sqrt{R_{\text{comp}}^2 + \Delta Z^2}$；
-3. **余弦定理求大臂内角 $\alpha$ 与小臂内角 $\gamma$**：
 
-$$
-\cos(\alpha) = \frac{L_2^2 + D^2 - L_3^2}{2 L_2 D}, \quad \cos(\gamma) = \frac{L_2^2 + L_3^2 - D^2}{2 L_2 L_3}
-$$
+1. **底座回转角**：求解航向角 $\theta_1$ 并映射至舵机基准角 $t_1^{\text{deg}}$：
 
-4. **关节角求解**：$\beta = \text{atan2}(\Delta Z, R_{\text{comp}})$，大臂角度 $t_2^{\text{deg}} = \text{degrees}(\beta + \alpha)$，小臂角度 $t_3^{\text{deg}} = t_2^{\text{deg}} - (180.0^\circ - \text{degrees}(\gamma))$，腕部相对角 $t_4^{\text{relative}} = -90.0^\circ - t_3^{\text{deg}}$。
+   $$
+   \theta_1 = \text{atan2}(X_{\text{comp}}, Y), \quad t_1^{\text{deg}} = \text{degrees}(\theta_1) + 90.0^\circ
+   $$
+
+2. **俯仰高度差与连杆弦长**：
+
+   $$
+   \Delta Z = (\text{comp}_z + L_4) - L_1, \quad D = \sqrt{R_{\text{comp}}^2 + \Delta Z^2}
+   $$
+
+3. **余弦定理求大臂内角** $\alpha$ **与小臂内角** $\gamma$ ：
+
+   $$
+   \cos(\alpha) = \frac{L_2^2 + D^2 - L_3^2}{2 L_2 D}, \quad \cos(\gamma) = \frac{L_2^2 + L_3^2 - D^2}{2 L_2 L_3}
+   $$
+
+4. **关节角求解**：
+
+   $$
+   \beta = \text{atan2}(\Delta Z, R_{\text{comp}})
+   $$
+
+   $$
+   t_2^{\text{deg}} = \text{degrees}(\beta + \alpha), \quad t_3^{\text{deg}} = t_2^{\text{deg}} - (180.0^\circ - \text{degrees}(\gamma)), \quad t_4^{\text{relative}} = -90.0^\circ - t_3^{\text{deg}}
+   $$
 
 #### 4. 微距五阶段防刮蹭轨迹规划 (`control.py`)
 为防止吸盘斜向运动碰倒相邻紧密排列的棋子，运动轨迹严格规划为五阶段航路点：
-- **平移至上方**：快速平移至棋子正上方安全巡航高度 $Z_{\text{safe}} = 70.0\,\text{mm}$；
-- **降至微距缓冲**：垂直降至距棋子表面上方 8mm 处悬停（$Z_{\text{micro}} = -25.0\,\text{mm}$），等待手腕姿态稳定调平；
-- **慢速垂直切入吸附**：慢速下探至盘面 $Z_{\text{board}} = -33.0\,\text{mm}$，继电器导通电磁铁吸起棋子，延时 0.5s；
-- **小臂主导纯垂直微抬**：纯垂直抬升 8mm 回到 $Z_{\text{micro}}$，彻底杜绝侧向摆动带倒邻子；
+- **平移至上方**：快速平移至棋子正上方安全巡航高度 $Z_{\text{safe}} = 70.0\,\text{mm}$ ；
+- **降至微距缓冲**：垂直降至距棋子表面上方 8mm 处悬停（ $Z_{\text{micro}} = -25.0\,\text{mm}$ ），等待手腕姿态稳定调平；
+- **慢速垂直切入吸附**：慢速下探至盘面 $Z_{\text{board}} = -33.0\,\text{mm}$ ，继电器导通电磁铁吸起棋子，延时 0.5s；
+- **小臂主导纯垂直微抬**：纯垂直抬升 8mm 回到 $Z_{\text{micro}}$ ，彻底杜绝侧向摆动带倒邻子；
 - **升至巡航高度**：垂直拉升至 $Z_{\text{safe}}$ 后平移至目标点，并在目标点执行相同的微距垂直下探释放动作。
 
 #### 5. 机械与运动控制的未来优化方向
@@ -219,7 +253,7 @@ $$
 
 | 硬件模组 | 物理接口 | 驱动协议 | 宿主控制引脚 | 电气特征与控制参数 |
 | :--- | :--- | :--- | :--- | :--- |
-| **PCA9685 舵机驱动板** | SDA / SCL | 硬件 I2C (100kHz 标准模式) | CH347 D0(SCL) / D1(SDA) | 16 通道 12 位分辨率，基准频率 50Hz ($T = 20\,\text{ms}$) |
+| **PCA9685 舵机驱动板** | SDA / SCL | 硬件 I2C (100kHz 标准模式) | CH347 D0(SCL) / D1(SDA) | 16 通道 12 位分辨率，基准频率 50Hz ( $T = 20\,\text{ms}$ ) |
 | **底座旋转舵机 (J1)** | PWM 通道 0 | 50Hz PWM 方波 | PCA9685 输出端 0 | RDS3235 金属数码舵机，水平方位角控制 |
 | **大臂俯仰舵机 (J2)** | PWM 通道 4 | 50Hz PWM 方波 | PCA9685 输出端 4 | RDS3235 35kg·cm 高扭矩数码舵机，大臂抬升控制 |
 | **小臂俯仰舵机 (J3)** | PWM 通道 8 | 50Hz PWM 方波 | PCA9685 输出端 8 | 20kg·cm 精密金属数码舵机，伸展半径与高度控制 |
@@ -229,13 +263,13 @@ $$
 | **WCH CH347 桥接器** | USB Type-C | 480Mbps 高速 USB | PC 宿主机 USB 口 | 硬件 USB 转 I2C/GPIO 工业桥接器 |
 
 ### PCA9685 12-Bit PWM 脉宽映射模型
-PCA9685 分辨率为 12 位（4096 级计数值），在周期 $T = 20\,\text{ms}$（50Hz）下，脉宽与寄存器 Tick 映射方程为：
+PCA9685 分辨率为 12 位（4096 级计数值），在周期 $T = 20\,\text{ms}$ （50Hz）下，脉宽与寄存器 Tick 映射方程为：
 
 $$
 \text{Tick} = \left\lfloor \frac{T_{\text{pulse}}(\text{ms})}{20\,\text{ms}} \times 4096 \right\rfloor
 $$
 
-对于 RDS3235 舵机（角度 $\theta \in [0^\circ, 270^\circ]$，脉宽 $0.5 \sim 2.5\,\text{ms}$）：
+对于 RDS3235 舵机（角度 $\theta \in [0^\circ, 270^\circ]$ ，脉宽 $0.5 \sim 2.5\,\text{ms}$ ）：
 
 $$
 T_{\text{pulse}}(\theta) = 0.5\,\text{ms} + \frac{\theta}{270^\circ} \times 2.0\,\text{ms}

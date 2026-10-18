@@ -116,39 +116,73 @@
 
 ### 4.1 機構およびモーション制御モジュール (担当: 田峻碩、調整補助: 劉超然)
 
-ベース旋回（J1）、第1アーム（J2）、第2アーム（J3）、手首姿勢（J4）からなる4自由度関節型ロボットアームであり、先端電磁吸盤は常時垂直下向き（$\phi = -90^\circ$）に拘束されます。
+ベース旋回（J1）、第1アーム（J2）、第2アーム（J3）、手首姿勢（J4）からなる4自由度関節型ロボットアームであり、先端電磁吸盤は常时垂直下向き（ $\phi = -90^\circ$ ）に拘束されます。
 
 #### 1. 物理リンク幾何寸法 (`config.py`)
-- ベース旋回中心高：$L_1 = 73.0\,\text{mm}$
-- 第1アーム長：$L_2 = 231.0\,\text{mm}$
-- 第2アーム長：$L_3 = 231.0\,\text{mm}$
-- 手首関節〜吸盤端長：$L_4 = 66.0\,\text{mm}$
+- ベース旋回中心高： $L_1 = 73.0\,	ext{mm}$
+- 第1アーム長： $L_2 = 231.0\,	ext{mm}$
+- 第2アーム長： $L_3 = 231.0\,	ext{mm}$
+- 手首関節〜吸盤端長： $L_4 = 66.0\,	ext{mm}$
 
 #### 2. 非線形フィードフォワード補償モデル (`kinematics.py`)
 長アーム自重による弾性たわみと開ループサーボのバックラッシュを補償する制御則を導入：
-- **X 軸横方向幾何ゲイン補償**：$X_{\text{comp}} = X \times K_x \quad (K_x = 1.125)$
-- **合成作業半径・伸長補正**：$R_{\text{target}} = \sqrt{X_{\text{comp}}^2 + Y^2}$、$R_{\text{comp}} = R_{\text{target}} \times (1 - K_r) \quad (K_r = 0.06)$
-- **自重たわみ高さフィードフォワード補償**：$\text{comp}_z = Z + (R_{\text{target}} \times K_z) \quad (K_z = 0.12)$
+
+- **X 軸横方向幾何ゲイン補償**：
+
+  $$
+  X_{	ext{comp}} = X 	imes K_x \quad (K_x = 1.125)
+  $$
+
+- **合成作業半径・伸長補正**：
+
+  $$
+  R_{	ext{target}} = \sqrt{X_{	ext{comp}}^2 + Y^2}, \quad R_{	ext{comp}} = R_{	ext{target}} 	imes (1 - K_r) \quad (K_r = 0.06)
+  $$
+
+- **自重たわみ高さフィードフォワード補償**：
+
+  $$
+  	ext{comp}_z = Z + (R_{	ext{target}} 	imes K_z) \quad (K_z = 0.12)
+  $$
 
 #### 3. 幾何学的解析逆運動学（IK）の求解
 手首垂直拘束のもと、空間3次元問題をピッチ平面へ幾何学的に分解して閉形式で求解：
-1. **ベース旋回角**：$\theta_1 = \text{atan2}(X_{\text{comp}}, Y)$、サーボ角へ換算 $t_1^{\text{deg}} = \text{degrees}(\theta_1) + 90.0^\circ$；
-2. **ピッチ高度差と弦長**：$\Delta Z = (\text{comp}_z + L_4) - L_1$、$D = \sqrt{R_{\text{comp}}^2 + \Delta Z^2}$；
+
+1. **ベース旋回角**：方位角 $	heta_1$ を求めてサーボ目標角 $t_1^{	ext{deg}}$ へ換算：
+
+   $$
+   	heta_1 = 	ext{atan2}(X_{	ext{comp}}, Y), \quad t_1^{	ext{deg}} = 	ext{degrees}(	heta_1) + 90.0^\circ
+   $$
+
+2. **ピッチ高度差と弦長**：
+
+   $$
+   \Delta Z = (	ext{comp}_z + L_4) - L_1, \quad D = \sqrt{R_{	ext{comp}}^2 + \Delta Z^2}
+   $$
+
 3. **余弦定理による関節内角の算出**：
 
-$$
-\cos(\alpha) = \frac{L_2^2 + D^2 - L_3^2}{2 L_2 D}, \quad \cos(\gamma) = \frac{L_2^2 + L_3^2 - D^2}{2 L_2 L_3}
-$$
+   $$
+   \cos(lpha) = rac{L_2^2 + D^2 - L_3^2}{2 L_2 D}, \quad \cos(\gamma) = rac{L_2^2 + L_3^2 - D^2}{2 L_2 L_3}
+   $$
 
-4. **各軸目標角の算出**：$\beta = \text{atan2}(\Delta Z, R_{\text{comp}})$、第1アーム角 $t_2^{\text{deg}} = \text{degrees}(\beta + \alpha)$、第2アーム角 $t_3^{\text{deg}} = t_2^{\text{deg}} - (180.0^\circ - \text{degrees}(\gamma))$、手首相対角 $t_4^{\text{relative}} = -90.0^\circ - t_3^{\text{deg}}$。
+4. **各軸目標角の算出**：
+
+   $$
+   eta = 	ext{atan2}(\Delta Z, R_{	ext{comp}})
+   $$
+
+   $$
+   t_2^{	ext{deg}} = 	ext{degrees}(eta + lpha), \quad t_3^{	ext{deg}} = t_2^{	ext{deg}} - (180.0^\circ - 	ext{degrees}(\gamma)), \quad t_4^{	ext{relative}} = -90.0^\circ - t_3^{	ext{deg}}
+   $$
 
 #### 4. 微小空間5段階衝突回避ピック＆プレース軌道計画 (`control.py`)
 密集配置された隣接駒への接触転倒を防ぐため、厳格な5段階ウェイポイント軌道を生成：
-- **直上へ水平巡航**：安全巡航高度 $Z_{\text{safe}} = 70.0\,\text{mm}$ へ高速移動；
-- **微小緩衝層への降下**：駒上面の 8mm 上空（$Z_{\text{micro}} = -25.0\,\text{mm}$）で一時静止し手首姿勢を直立安定化；
-- **垂直進入と電磁吸着**：低速で盤面 $Z_{\text{board}} = -33.0\,\text{mm}$ へ垂直降下し、リレーONで電磁石吸着（0.5秒保持）；
-- **純垂直微小引き上げ**：前腕主導で純垂直に 8mm 引き上げ（$Z_{\text{micro}}$ へ復帰）、横揺れによる隣接駒の接触を完全に遮断；
-- **巡航移動と目標着手**：$Z_{\text{safe}}$ へ上昇後、目標位置直上へ水平移動し、同様の垂直微小進入により確実に駒を解放。
+- **直上へ水平巡航**：安全巡航高度 $Z_{	ext{safe}} = 70.0\,	ext{mm}$ へ高速移動；
+- **微小緩衝層への降下**：駒上面の 8mm 上空（ $Z_{	ext{micro}} = -25.0\,	ext{mm}$ ）で一時静止し手首姿勢を直立安定化；
+- **垂直進入と電磁吸着**：低速で盤面 $Z_{	ext{board}} = -33.0\,	ext{mm}$ へ垂直降下し、リレーONで電磁石吸着（0.5秒保持）；
+- **純垂直微小引き上げ**：前腕主導で純垂直に 8mm 引き上げ（ $Z_{	ext{micro}}$ へ復帰）、横揺れによる隣接駒の接触を完全に遮断；
+- **巡航移動と目標着手**： $Z_{	ext{safe}}$ へ上昇後、目標位置直上へ水平移動し、同様の垂直微小進入により確実に駒を解放。
 
 #### 5. モーション制御の今後の改良計画
 今後は多軸補間プロファイルに S 字加減速フィルタを組み込み、長距離移動時のメカニカルな振動を極小化する予定です。
@@ -219,7 +253,7 @@ $$
 
 | モジュール | 物理ポート | 通信規約 | 接続先 | 制御パラメータ |
 | :--- | :--- | :--- | :--- | :--- |
-| **PCA9685 サーボドライバ** | SDA / SCL | ハードウェア I2C (100kHz 標準) | CH347 D0(SCL) / D1(SDA) | 16ch 12ビット PWM、50Hz ($T = 20\,\text{ms}$) |
+| **PCA9685 サーボドライバ** | SDA / SCL | ハードウェア I2C (100kHz 標準) | CH347 D0(SCL) / D1(SDA) | 16ch 12ビット PWM、50Hz ( $T = 20\,\text{ms}$ ) |
 | **ベース旋回 (J1)** | PWM ch0 | 50Hz PWM | PCA9685 出力0 | RDS3235 金属サーボ、水平方位角 |
 | **第1アーム (J2)** | PWM ch4 | 50Hz PWM | PCA9685 出力4 | RDS3235 35kg·cm 高トルクサーボ、リフト |
 | **第2アーム (J3)** | PWM ch8 | 50Hz PWM | PCA9685 出力8 | 20kg·cm デジタルサーボ、前後半径 |
@@ -235,7 +269,7 @@ $$
 \text{Tick} = \left\lfloor \frac{T_{\text{pulse}}(\text{ms})}{20\,\text{ms}} \times 4096 \right\rfloor
 $$
 
-RDS3235 サーボ（$\theta \in [0^\circ, 270^\circ]$、パルス幅 $0.5 \sim 2.5\,\text{ms}$）：
+RDS3235 サーボ（ $\theta \in [0^\circ, 270^\circ]$ 、パルス幅 $0.5 \sim 2.5\,\text{ms}$ ）：
 
 $$
 T_{\text{pulse}}(\theta) = 0.5\,\text{ms} + \frac{\theta}{270^\circ} \times 2.0\,\text{ms}

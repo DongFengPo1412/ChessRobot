@@ -73,7 +73,7 @@ All software and hardware were developed collaboratively by four core team membe
 | Member | Engineering Role | Core Deliverables & Contributions |
 | :--- | :--- | :--- |
 | **Tian Junshuo (田峻硕)** | **Team Lead / Mechanical & Motion Control Lead** | <ul><li>4-DOF robotic arm physical assembly, servo selection, and mechanical joint tuning;</li><li>WCH CH347 high-speed USB bridge and PCA9685 12-bit PWM hardware driver implementation (`hardware.py`);</li><li>Derivation of analytical closed-form inverse kinematics (IK) equations (`kinematics.py`);</li><li>5-phase collision-free micro-approach trajectory planning control law (`control.py`).</li></ul> |
-| **Liu Chaoran (刘超然)** | **Vision Perception Lead** | <ul><li><b>Independently conducted 100% of physical dataset collection, cleaning, and annotation</b>;</li><li>Spearheaded all 4 generations of vision architecture, developing lightweight YOLO piece localization & red/black classification;</li><li>Implemented OpenCV homography ($3 \times 3$ matrix) 4-point perspective calibration & physical grid mapping (`localization/find_chess_new.py`);</li><li>Developed the multithreaded PyQt5 interactive operator dashboard (`ui_main.py`);</li><li><b>Assisted in robotic motion control parameter tuning</b> (including cantilever gravity droop elevation feedforward compensation).</li></ul> |
+| **Liu Chaoran (刘超然)** | **Vision Perception Lead** | <ul><li><b>Independently conducted 100% of physical dataset collection, cleaning, and annotation</b>;</li><li>Spearheaded all 4 generations of vision architecture, developing lightweight YOLO piece localization & red/black classification;</li><li>Implemented OpenCV homography ( $3 \times 3$ matrix) 4-point perspective calibration & physical grid mapping (`localization/find_chess_new.py`);</li><li>Developed the multithreaded PyQt5 interactive operator dashboard (`ui_main.py`);</li><li><b>Assisted in robotic motion control parameter tuning</b> (including cantilever gravity droop elevation feedforward compensation).</li></ul> |
 | **Zhang Zichen (张子琛)** | **Game Decision & Rule Engine Lead** | <ul><li>Engineered complete 10x9 Chinese chess rule engine, move validation, and history rollback (`game/board.py`);</li><li>Developed PyTorch CNN evaluation network (`ChessNet`, 14-channel input / 8100-dim action space) (`game/ai.py`);</li><li>Standardized chessboard coordinate representations and initial game setup constants (`game/constants.py`).</li></ul> |
 | **Xing Yilong (邢艺龙)** | **System Integration & Fixtures Lead** | <ul><li>Managed hardware wiring, power distribution, and electrical safety standards;</li><li>Fabricated custom magnetic chessboard, assembled handmade magnetic pieces, and built electromagnet toolhead fixtures;</li><li>Constructed multi-axis physical test bench, assisting in multi-axis motion integration (`tools/`).</li></ul> |
 
@@ -116,7 +116,7 @@ The codebase is organized into three decoupled technical modules: **Mechanical &
 
 ### 4.1 Mechanical & Motion Control Module (Lead: Tian Junshuo, Co-tuning: Liu Chaoran)
 
-The manipulator features a 4-DOF articulated design: Base Yaw (J1), Shoulder Pitch (J2), Elbow Pitch (J3), and Wrist Pitch (J4), with an electromagnetic toolhead constrained strictly vertical ($\phi = -90^\circ$).
+The manipulator features a 4-DOF articulated design: Base Yaw (J1), Shoulder Pitch (J2), Elbow Pitch (J3), and Wrist Pitch (J4), with an electromagnetic toolhead constrained strictly vertical ( $\phi = -90^\circ$ ).
 
 #### 1. Physical Linkage Parameters (`config.py`)
 - Base rotation height: $L_1 = 73.0\,\text{mm}$
@@ -126,28 +126,62 @@ The manipulator features a 4-DOF articulated design: Base Yaw (J1), Shoulder Pit
 
 #### 2. Non-Linear Kinematic Feedforward Compensation (`kinematics.py`)
 To counteract cantilever gravitational deflection and gear backlash from open-loop digital servos:
-- **X-Axis Lateral Scaling Feedforward**: $X_{\text{comp}} = X \times K_x \quad (K_x = 1.125)$
-- **Synthesized Working Radius Adjustment**: $R_{\text{target}} = \sqrt{X_{\text{comp}}^2 + Y^2}$, $R_{\text{comp}} = R_{\text{target}} \times (1 - K_r) \quad (K_r = 0.06)$
-- **Cantilever Sag Elevation Feedforward**: $\text{comp}_z = Z + (R_{\text{target}} \times K_z) \quad (K_z = 0.12)$
+
+- **X-Axis Lateral Scaling Feedforward**:
+
+  $$
+  X_{\text{comp}} = X \times K_x \quad (K_x = 1.125)
+  $$
+
+- **Synthesized Working Radius Adjustment**:
+
+  $$
+  R_{\text{target}} = \sqrt{X_{\text{comp}}^2 + Y^2}, \quad R_{\text{comp}} = R_{\text{target}} \times (1 - K_r) \quad (K_r = 0.06)
+  $$
+
+- **Cantilever Sag Elevation Feedforward**:
+
+  $$
+  \text{comp}_z = Z + (R_{\text{target}} \times K_z) \quad (K_z = 0.12)
+  $$
 
 #### 3. Analytical Geometric Inverse Kinematics
 Enforcing end-effector vertical constraint decodes 3D coordinates into planar pitch equations:
-1. **Base Azimuth**: $\theta_1 = \text{atan2}(X_{\text{comp}}, Y)$, mapped to servo angle $t_1^{\text{deg}} = \text{degrees}(\theta_1) + 90.0^\circ$;
-2. **Elevation Delta & Link Chord**: $\Delta Z = (\text{comp}_z + L_4) - L_1$, $D = \sqrt{R_{\text{comp}}^2 + \Delta Z^2}$;
-3. **Law of Cosines for Shoulder Angle $\alpha$ & Elbow Angle $\gamma$**:
 
-$$
-\cos(\alpha) = \frac{L_2^2 + D^2 - L_3^2}{2 L_2 D}, \quad \cos(\gamma) = \frac{L_2^2 + L_3^2 - D^2}{2 L_2 L_3}
-$$
+1. **Base Azimuth**: Solve base heading angle $\theta_1$ and map to servo angle $t_1^{\text{deg}}$:
 
-4. **Joint Angles**: $\beta = \text{atan2}(\Delta Z, R_{\text{comp}})$, Shoulder angle $t_2^{\text{deg}} = \text{degrees}(\beta + \alpha)$, Elbow angle $t_3^{\text{deg}} = t_2^{\text{deg}} - (180.0^\circ - \text{degrees}(\gamma))$, Wrist angle $t_4^{\text{relative}} = -90.0^\circ - t_3^{\text{deg}}$.
+   $$
+   \theta_1 = \text{atan2}(X_{\text{comp}}, Y), \quad t_1^{\text{deg}} = \text{degrees}(\theta_1) + 90.0^\circ
+   $$
+
+2. **Elevation Delta & Link Chord**:
+
+   $$
+   \Delta Z = (\text{comp}_z + L_4) - L_1, \quad D = \sqrt{R_{\text{comp}}^2 + \Delta Z^2}
+   $$
+
+3. **Law of Cosines for Shoulder Angle** $\alpha$ **& Elbow Angle** $\gamma$ :
+
+   $$
+   \cos(\alpha) = \frac{L_2^2 + D^2 - L_3^2}{2 L_2 D}, \quad \cos(\gamma) = \frac{L_2^2 + L_3^2 - D^2}{2 L_2 L_3}
+   $$
+
+4. **Joint Angles**:
+
+   $$
+   \beta = \text{atan2}(\Delta Z, R_{\text{comp}})
+   $$
+
+   $$
+   t_2^{\text{deg}} = \text{degrees}(\beta + \alpha), \quad t_3^{\text{deg}} = t_2^{\text{deg}} - (180.0^\circ - \text{degrees}(\gamma)), \quad t_4^{\text{relative}} = -90.0^\circ - t_3^{\text{deg}}
+   $$
 
 #### 4. Micro-Space 5-Phase Collision-Free Trajectory Planning (`control.py`)
 To prevent the suction head from colliding with tightly spaced neighbor pieces:
-- **Cruise Transfer**: Fast transfer to safety cruising altitude $Z_{\text{safe}} = 70.0\,\text{mm}$;
-- **Micro-Hovering**: Descend to 8mm micro-buffer layer above piece ($Z_{\text{micro}} = -25.0\,\text{mm}$) to stabilize wrist posture;
-- **Slow Plunge & Suction**: Gentle descent to board plane $Z_{\text{board}} = -33.0\,\text{mm}$, relay energizes electromagnet, holding for 0.5s;
-- **Forced Vertical Lift**: Pure vertical elevation of 8mm back to $Z_{\text{micro}}$, isolating lateral tipping;
+- **Cruise Transfer**: Fast transfer to safety cruising altitude $Z_{\text{safe}} = 70.0\,\text{mm}$ ;
+- **Micro-Hovering**: Descend to 8mm micro-buffer layer above piece ( $Z_{\text{micro}} = -25.0\,\text{mm}$ ) to stabilize wrist posture;
+- **Slow Plunge & Suction**: Gentle descent to board plane $Z_{\text{board}} = -33.0\,\text{mm}$ , relay energizes electromagnet, holding for 0.5s;
+- **Forced Vertical Lift**: Pure vertical elevation of 8mm back to $Z_{\text{micro}}$ , isolating lateral tipping;
 - **Cruise Elevation**: Lift to $Z_{\text{safe}}$ and transfer to destination, executing reciprocal micro-approach placement.
 
 #### 5. Motion Control Optimization Roadmap
@@ -219,7 +253,7 @@ The physical hardware electrical topology is organized below:
 
 | Module | Physical Interface | Protocol | Host Pins | Parameters & Electrical Specs |
 | :--- | :--- | :--- | :--- | :--- |
-| **PCA9685 Servo Driver** | SDA / SCL | Hardware I2C (100kHz Standard) | CH347 D0(SCL) / D1(SDA) | 16-ch 12-bit PWM, 50Hz ($T = 20\,\text{ms}$) |
+| **PCA9685 Servo Driver** | SDA / SCL | Hardware I2C (100kHz Standard) | CH347 D0(SCL) / D1(SDA) | 16-ch 12-bit PWM, 50Hz ( $T = 20\,\text{ms}$ ) |
 | **Base Yaw (J1)** | PWM Channel 0 | 50Hz PWM | PCA9685 Output 0 | RDS3235 Metal Servo, Azimuth |
 | **Shoulder Pitch (J2)** | PWM Channel 4 | 50Hz PWM | PCA9685 Output 4 | RDS3235 35kg·cm High-Torque Servo, Lift |
 | **Elbow Pitch (J3)** | PWM Channel 8 | 50Hz PWM | PCA9685 Output 8 | 20kg·cm Digital Metal Servo, Radius & Elevation |
@@ -235,7 +269,7 @@ $$
 \text{Tick} = \left\lfloor \frac{T_{\text{pulse}}(\text{ms})}{20\,\text{ms}} \times 4096 \right\rfloor
 $$
 
-For RDS3235 servos ($\theta \in [0^\circ, 270^\circ]$, pulse width $0.5 \sim 2.5\,\text{ms}$):
+For RDS3235 servos ( $\theta \in [0^\circ, 270^\circ]$ , pulse width $0.5 \sim 2.5\,\text{ms}$ ):
 
 $$
 T_{\text{pulse}}(\theta) = 0.5\,\text{ms} + \frac{\theta}{270^\circ} \times 2.0\,\text{ms}
