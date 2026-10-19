@@ -165,11 +165,7 @@ The manipulator features a 4-DOF articulated serial configuration: Base Yaw (J1)
 - **Algorithm 4: 50Hz Trajectory Interpolation with 0.1mm Float Deadzone Control (`move_to_smooth`)**:
   - **Core Principle**: The interpolator evaluates intermediate steps at 50Hz (`steps = int(duration * 50)`). During pure vertical travel, floating-point roundoff in inverse trigonometry produces spurious $10^{-4}$ mm lateral deltas, causing high-frequency chatter in the base servo;
   - **Deadzone Formulation**:
-
-    $$
-    \Delta X_{\text{step}} = \frac{X_{\text{target}} - X_{\text{cur}}}{\text{steps}} \quad (\text{if } |X_{\text{target}} - X_{\text{cur}}| > 0.1\text{ mm, else } 0.0)
-    $$
-
+    $$\Delta X_{\text{step}} = \frac{X_{\text{target}} - X_{\text{cur}}}{\text{steps}} \quad (|X_{\text{target}} - X_{\text{cur}}| \ge 0.1\text{ mm})$$
     Clamping sub-0.1mm increments strictly to zero cuts off horizontal servo pulses, ensuring pristine vertical descent.
 
 - **Algorithm 5: 12-Bit PCA9685 PWM Quantization & Hardware Driver Mapping (`hardware.py`)**:
@@ -243,19 +239,19 @@ The vision perception pipeline was independently developed by Liu Chaoran across
   - **5. LAB Color Space CLAHE Adaptive Histogram Equalization**:
     Transforms frames to LAB color space, applying Contrast Limited Adaptive Histogram Equalization (`clipLimit=3.5, tileGridSize=(8, 8)`) to the L-channel, enhancing dark strokes and evening out asymmetric desk lamp illumination;
   - **6. 15px Core Margin Erosion & L-Channel Luminance Ratio Black Piece Classifier (`is_black_piece`)**:
-    Erodes detection bounding boxes inward by 15px (`y1+15:y2-15, x1+15:x2-15`) to isolate wooden rims and board gridlines. If deep black pixels ( $L < 45$ ) exceed 50% of the eroded core, the piece is classified as Black, fully immune to ambient colored illumination;
+    Erodes detection bounding boxes inward by 15px (`y1+15:y2-15, x1+15:x2-15`) to isolate wooden rims and board gridlines. If deep black pixels ( $L \lt 45$ ) exceed 50% of the eroded core, the piece is classified as Black, fully immune to ambient colored illumination;
   - **7. Orientation Polarity Auto-Alignment (`set_black_view`)**:
     Calculates the mean Y coordinate of Black pieces at game setup: if Black is in the upper visual half (far side), Pt1 maps to A0; if Black is in the lower half (near side), Pt3 maps to A0, automatically handling 180° board rotation without manual configuration;
   - **8. Chu River Physical Deadzone Filtering**:
-    Enforces a spatial deadzone across the river divide ( $4.35 < y < 4.65$ ), discarding spurious bounding boxes triggered by decorative calligraphy printed in the center river;
+    Enforces a spatial deadzone across the river divide ( $4.35 \lt y \lt 4.65$ ), discarding spurious bounding boxes triggered by decorative calligraphy printed in the center river;
   - **9. Dual-Threshold Confidence Gate with Hysteresis**:
     Sets entrance threshold `detect_conf = 0.50` and retention threshold `keep_conf = 0.20`, creating a Schmitt-trigger hysteresis loop that rejects transient false positives while maintaining persistent track of pieces under partial shadow;
   - **10. Centroid EMA Smoothing with 1.5px Deadzone**:
-    Updates tracked centroids via Exponential Moving Average ( $\alpha = 0.28$ ) with a 1.5px Euclidean deadzone ( $\text{dist}^2 > 2.25\text{ px}^2$ ), eliminating sensor thermal subpixel noise and arm vibration;
+    Updates tracked centroids via Exponential Moving Average ( $\alpha = 0.28$ ) with a 1.5px Euclidean deadzone ( $\text{dist}^2 \gt 2.25\text{ px}^2$ ), eliminating sensor thermal subpixel noise and arm vibration;
   - **11. Teleportation Fast-Move Bypass (`find2.txt`)**:
-    When squared centroid displacement exceeds $\Delta d^2 > 2500\text{ px}^2$, the algorithm flags rapid human manipulation, bypassing EMA filtering to instantly register new physical coordinates without trajectory lag;
+    When squared centroid displacement exceeds $\Delta d^2 \gt 2500\text{ px}^2$, the algorithm flags rapid human manipulation, bypassing EMA filtering to instantly register new physical coordinates without trajectory lag;
   - **12. Global Motion Gating**:
-    When any piece displacement satisfies $\Delta d^2 > 25\text{ px}^2$, sets `global_motion = True` and flushes the sliding stabilization window, ensuring no partial moves are committed;
+    When any piece displacement satisfies $\Delta d^2 \gt 25\text{ px}^2$, sets `global_motion = True` and flushes the sliding stabilization window, ensuring no partial moves are committed;
   - **13. Piece Energy Tracking & 12-Frame Historical Majority Voting**:
     Maintains an energy accumulator for each track ID (+40 on detection, -15 on miss, activation at 50). A 12-frame double-ended queue (`deque(maxlen=12)`) performs majority voting (`Counter.most_common(1)`) to lock discrete grid positions against single-frame flickers;
   - **14. Active Visual Suppression During Robotic Manipulation (`suppress_detection`)**:
@@ -312,8 +308,8 @@ Implements the comprehensive rule set of Chinese Chess, providing legal move val
 - **General Orthogonal Movement & Flying General Rule (`is_jiang_valid`)**:
   Restricted to $|dx| + |dy| = 1$ within the palace; enforces the "Flying General" prohibition against unobstructed collinear generals;
 - **Soldier Forward / Lateral River Transition State Machine (`is_zu_valid`)**:
-  - Red Soldier: Prior to crossing river ( $y_1 > 4$ ), only forward motion allowed ( $dx=0, dy=-1$ ); after crossing ( $y_1 \le 4$ ), allows forward or lateral moves ( $dy=-1$ or $dy=0, |dx|=1$ ), backward moves forbidden;
-  - Black Soldier: Prior to crossing river ( $y_1 < 5$ ), only forward motion allowed ( $dx=0, dy=1$ ); after crossing ( $y_1 \ge 5$ ), allows forward or lateral moves ( $dy=1$ or $dy=0, |dx|=1$ ), backward moves forbidden;
+  - Red Soldier: Prior to crossing river ( $y_1 \gt 4$ ), only forward motion allowed ( $dx=0, dy=-1$ ); after crossing ( $y_1 \le 4$ ), allows forward or lateral moves ( $dy=-1$ or $dy=0, |dx|=1$ ), backward moves forbidden;
+  - Black Soldier: Prior to crossing river ( $y_1 \lt 5$ ), only forward motion allowed ( $dx=0, dy=1$ ); after crossing ( $y_1 \ge 5$ ), allows forward or lateral moves ( $dy=1$ or $dy=0, |dx|=1$ ), backward moves forbidden;
 - **Full Legal Move Enumeration (`get_all_legal_moves`) & Undo Stack**:
   Scans all active pieces to enumerate all valid actions across 90 intersections, driving AI decision trees and checkmate verification.
 
