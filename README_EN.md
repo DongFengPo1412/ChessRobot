@@ -48,12 +48,12 @@ This platform integrates custom physical fixtures, embedded drivers, vision reco
 
 ### 1.1 Physical Chessboard & Handcrafted Magnetic Pieces
 - **Physical Chessboard Selection & Mechanical Evolution**:
-  - **Eliminated Initial Version ( $40 \times 40\,\text{cm}$ Dark Green Flexible Mat )**: Initially procured a $40 \times 40\,\text{cm}$ dark green flexible soft chessboard. However, during kinematic integration with the 4-DOF manipulator, mechanical workspace limits (upper arm $L_2 = 231\,\text{mm}$, forearm $L_3 = 231\,\text{mm}$) prevented the electromagnetic end-effector from reaching outer edge intersections on the furthest 9th rank (Red baseline), exceeding the arm's reach limit and forcing its prompt elimination;
-  - **Standardized Production Version ( $35 \times 35\,\text{cm}$ Beige Flexible Mat )**: Replaced with a custom $35 \times 35\,\text{cm}$ beige portable soft Chinese chessboard (flexible mat). The grid center-to-center spacing is compressed to approx. $34.2\,\text{mm}$ (strictly matching `SQUARE_WIDTH = 34.2` and `BOARD_ORIGIN_Y = 200.0` in `config.py`), enabling the robotic arm to reliably and smoothly cover all 90 grid intersections across the entire board.
+  - **Eliminated Initial Version ( 40 × 40 cm Dark Green Flexible Mat )**: Initially procured a 40 × 40 cm dark green flexible soft chessboard. However, during kinematic integration with the 4-DOF manipulator, mechanical workspace limits (upper arm $L_2 = 231$ mm, forearm $L_3 = 231$ mm) prevented the electromagnetic end-effector from reaching outer edge intersections on the furthest 9th rank (Red baseline), exceeding the arm's reach limit and forcing its prompt elimination;
+  - **Standardized Production Version ( 35 × 35 cm Beige Flexible Mat )**: Replaced with a custom 35 × 35 cm beige portable soft Chinese chessboard (flexible mat). The grid center-to-center spacing is compressed to approx. 34.2 mm (strictly matching `SQUARE_WIDTH = 34.2` and `BOARD_ORIGIN_Y = 200.0` in `config.py`), enabling the robotic arm to reliably and smoothly cover all 90 grid intersections across the entire board.
 - **Handmade Magnetic Pieces**:
-  - Printed high-contrast red and black Chinese chess character templates (Microsoft YaHei font, bold) sized at exactly $3.0\,\text{cm}$ diameter;
+  - Printed high-contrast red and black Chinese chess character templates (Microsoft YaHei font, bold) sized at exactly 3.0 cm diameter;
   - Manually precision-cut all 32 character circles;
-  - Procured $3.0\,\text{cm}$ diameter circular magnetic iron discs, manually adhering the printed labels onto the discs to create custom magnetic pieces.
+  - Procured 3.0 cm diameter circular magnetic iron discs, manually adhering the printed labels onto the discs to create custom magnetic pieces.
 - **End-Effector & Actuation**:
   - Outfitted with a 5V DC suction electromagnet driven by an onboard relay switch;
   - During pickup, the arm descends vertically over the target piece, the relay engages to energize the electromagnet, securing the magnetic piece;
@@ -121,15 +121,15 @@ The robotic system is architected into three decoupled technical modules: **Mech
 The manipulator features a 4-DOF articulated serial configuration: Base Yaw (J1), Shoulder Pitch (J2), Elbow Pitch (J3), and Wrist Pitch (J4), terminating in a miniaturized electromagnetic suction toolhead constrained strictly perpendicular to the board ( $\phi = -90^\circ$ ).
 
 #### 1. Physical Linkage Parameters (`config.py`)
-- Base rotation axis height: $L_1 = 73.0\,\text{mm}$
-- Upper-arm effective length: $L_2 = 231.0\,\text{mm}$
-- Forearm effective length: $L_3 = 231.0\,\text{mm}$
-- Wrist joint to suction center: $L_4 = 66.0\,\text{mm}$
+- Base rotation axis height: $L_1 = 73.0$ mm
+- Upper-arm effective length: $L_2 = 231.0$ mm
+- Forearm effective length: $L_3 = 231.0$ mm
+- Wrist joint to suction center: $L_4 = 66.0$ mm
 
 #### 2. Motion Control Algorithmic Catalog
 
 - **Algorithm 1: Analytical Closed-Form Inverse Kinematics (IK) Formulation**:
-  - **Core Principle**: To prevent numerical divergence, singularities, and millisecond-level iterative latencies inherent in numerical Jacobian methods, the spatial 3D Cartesian coordinates are decoupled into the **horizontal yaw plane** and the **vertical pitch plane**. Subject to the vertical wrist constraint ($\phi = -90^\circ$), the Law of Cosines directly yields an analytical closed-form solution with $< 0.1\,\text{ms}$ computational overhead;
+  - **Core Principle**: To prevent numerical divergence, singularities, and millisecond-level iterative latencies inherent in numerical Jacobian methods, the spatial 3D Cartesian coordinates are decoupled into the **horizontal yaw plane** and the **vertical pitch plane**. Subject to the vertical wrist constraint ($\phi = -90^\circ$), the Law of Cosines directly yields an analytical closed-form solution with < 0.1 ms computational overhead;
   - **Mathematical Modeling**:
     - **Base Yaw Angle**:
       $$\theta_1 = \text{atan2}(X_{\text{comp}}, Y), \quad t_1^{\text{deg}} = \text{degrees}(\theta_1) + 90.0^\circ$$
@@ -151,27 +151,27 @@ The manipulator features a 4-DOF articulated serial configuration: Base Yaw (J1)
     - **Cantilever Gravitational Elastic Sag Compensation**: Compensates for bending sag increasing with moment arm length by elevating the target $Z$,
       $$\text{comp}_z = Z + (R_{\text{target}} \times K_z) \quad (K_z = 0.12)$$
     - **Base Servo Travel Gain Scaling (`base_gain`)**:
-      $$us_0 = \text{ref\_us}_0 - (t_1 - 90.0^\circ) \times \text{DEG\_TO\_US} \times \text{base\_gain} \quad (\text{base\_gain} = 1.0)$$
+      $$u_0 = u_{0,\text{ref}} - (t_1 - 90.0^\circ) \times K_{\text{deg}} \times K_{\text{base}} \quad (K_{\text{base}} = 1.0)$$
 
 - **Algorithm 3: 5-Phase Micro-Approach Collision-Free Trajectory Planning (`control.py`)**:
-  - **Core Principle**: Given the tight $35\,\text{mm}$ grid spacing versus $\approx 30\,\text{mm}$ piece diameters (leaving $< 5\,\text{mm}$ clearance), diagonal suction descent inevitably knocks over adjacent pieces. Trajectories are discretized into 5 sequential 3D waypoints:
-    1. **Cruise Transit**: Rapid horizontal transit at safe cruise elevation $Z_{\text{safe}} = 70.0\,\text{mm}$;
-    2. **Micro-Approach Hover**: Vertical descent to hover 8mm above piece surface ($Z_{\text{micro}} = -25.0\,\text{mm}$), holding 0.3s for wrist plumb stabilization;
-    3. **Slow Vertical Plunge & Magnetization**: Slow vertical insertion to board level $Z_{\text{board}} = -33.0\,\text{mm}$, energizing the electromagnet with a 0.5s dwell for magnetic flux coupling;
+  - **Core Principle**: Given the tight 35 mm grid spacing versus ≈ 30 mm piece diameters (leaving < 5 mm clearance), diagonal suction descent inevitably knocks over adjacent pieces. Trajectories are discretized into 5 sequential 3D waypoints:
+    1. **Cruise Transit**: Rapid horizontal transit at safe cruise elevation $Z_{\text{safe}} = 70.0$ mm;
+    2. **Micro-Approach Hover**: Vertical descent to hover 8mm above piece surface ($Z_{\text{micro}} = -25.0$ mm), holding 0.3s for wrist plumb stabilization;
+    3. **Slow Vertical Plunge & Magnetization**: Slow vertical insertion to board level $Z_{\text{board}} = -33.0$ mm, energizing the electromagnet with a 0.5s dwell for magnetic flux coupling;
     4. **Elbow-Driven Pure Vertical Lift**: Slow, strictly vertical 8mm lift back to $Z_{\text{micro}}$, eliminating diagonal shear that trips neighboring pieces;
     5. **Cruise Transfer & Symmetrical Release**: Vertical ascent to $Z_{\text{safe}}$, transit to target grid point, followed by identical vertical plunge, demagnetization, and vertical retraction;
-  - **Capture Sequencing**: When capturing an opponent piece, the planner first commands acquisition and disposal of the victim piece into the external Graveyard ($(220, 120, \text{config.BOARD\_Z}+20)$) before executing the attacker's trajectory.
+  - **Capture Sequencing**: When capturing an opponent piece, the planner first commands acquisition and disposal of the victim piece into the external Graveyard ((220, 120, BOARD_Z + 20)) before executing the attacker's trajectory.
 
 - **Algorithm 4: 50Hz Trajectory Interpolation with 0.1mm Float Deadzone Control (`move_to_smooth`)**:
-  - **Core Principle**: The interpolator evaluates intermediate steps at 50Hz ($\text{steps} = \text{duration} \times 50$). During pure vertical travel, floating-point roundoff in inverse trigonometry produces spurious $10^{-4}\,\text{mm}$ lateral deltas, causing high-frequency chatter in the base servo;
+  - **Core Principle**: The interpolator evaluates intermediate steps at 50Hz ($\text{steps} = \text{duration} \times 50$). During pure vertical travel, floating-point roundoff in inverse trigonometry produces spurious $10^{-4}$ mm lateral deltas, causing high-frequency chatter in the base servo;
   - **Deadzone Formulation**:
-    $$\Delta x_{\text{step}} = \begin{cases} \frac{X_{\text{target}} - X_{\text{cur}}}{\text{steps}}, & \text{if } |X_{\text{target}} - X_{\text{cur}}| > 0.1\,\text{mm} \\ 0.0, & \text{otherwise} \end{cases}$$
+    $$\Delta X_{\text{step}} = \begin{cases} \frac{X_{\text{target}} - X_{\text{cur}}}{\text{steps}}, & \text{if } |X_{\text{target}} - X_{\text{cur}}| > 0.1\text{ mm} \\ 0.0, & \text{otherwise} \end{cases}$$
     Clamping sub-0.1mm increments strictly to zero cuts off horizontal servo pulses, ensuring pristine vertical descent.
 
 - **Algorithm 5: 12-Bit PCA9685 PWM Quantization & Hardware Driver Mapping (`hardware.py`)**:
-  - **Core Principle**: Commanded via CH347 High-Speed USB bridge over 100KHz I2C bus. The PCA9685 prescaler is set to 121 for a $50\,\text{Hz}$ carrier ($T = 20\,\text{ms}$);
+  - **Core Principle**: Commanded via CH347 High-Speed USB bridge over 100KHz I2C bus. The PCA9685 prescaler is set to 121 for a 50 Hz carrier ($T = 20$ ms);
   - **Pulse-to-Tick Mapping**:
-    $$\text{tick} = \left\lfloor \frac{\text{clamp}(\text{us}, \text{min\_us}, \text{max\_us})}{20000.0} \times 4096 \right\rfloor$$
+    $$\text{tick} = \left\lfloor \frac{\text{clamp}(u, u_{\min}, u_{\max})}{20000} \times 4096 \right\rfloor$$
     Maps microsecond pulse widths into 12-bit registers written in multi-byte blocks, while native CH347 GPIO2 drives the relay circuit with nanosecond switching response.
 
 #### 3. Motion Control Optimization Roadmap
@@ -196,7 +196,7 @@ The vision perception pipeline was independently developed by Liu Chaoran across
   - **3. Automated Font Template Synthesis & Cascaded 2-Stage CNN OCR**:
     Synthesized over 1,000 synthetic white-background red/black character images using Microsoft YaHei Bold, cascading circular ROI crops into the downstream CNN.
 - **Objective Root Causes of Retirement**:
-  - **Synthetic-to-Real Domain Gap**: Training on synthetic font tiles collapsed in the real physical world ($< 20\%$ real-world accuracy);
+  - **Synthetic-to-Real Domain Gap**: Training on synthetic font tiles collapsed in the real physical world (< 20% real-world accuracy);
   - **High-Altitude Scale Distortion**: The overhead camera rendered individual piece characters at very low pixel dimensions, severely blurring calligraphic strokes;
   - **Extreme Lighting Sensitivity**: Hough accumulators generated false positives on woodgrain specular highlights while missing shadow-obscured pieces.
 
@@ -205,12 +205,12 @@ The vision perception pipeline was independently developed by Liu Chaoran across
   Abandoned classical heuristics in favor of deep object detection architectures. Designed a complete physical acquisition protocol:
 - **Gen 2 Algorithmic Catalog**:
   - **1. 40cm Altitude Overhead Image Acquisition Protocol (`collect_real_data.py`)**:
-    Rigidly mounted the camera $40\,\text{cm}$ above the board, collecting 620 high-altitude images (1280×720) across empty layouts, opening phases, mid-game, and hand-occluded states. Annotated 14 piece classes on **Roboflow** (32 pieces per image);
+    Rigidly mounted the camera 40 cm above the board, collecting 620 high-altitude images (1280×720) across empty layouts, opening phases, mid-game, and hand-occluded states. Annotated 14 piece classes on **Roboflow** (32 pieces per image);
   - **2. Extreme Hybrid Augmentation Pipeline (`train.py`)**:
     To maximize robustness under harsh ambient lab lighting, fine-tuned YOLOv11n on local **RTX 4060** using extreme data augmentations:
-    - **Spatial Affine Transforms**: Arbitrary rotation $\pm 45^\circ$ (`degrees=45.0`), translation $\pm 15\%$, scale $\pm 60\%$, shear $\pm 15^\circ$, and random horizontal/vertical flips (`fliplr/flipud=0.5`);
+    - **Spatial Affine Transforms**: Arbitrary rotation $\pm 45^\circ$ (`degrees=45.0`), translation ±15%, scale ±60%, shear $\pm 15^\circ$, and random horizontal/vertical flips (`fliplr/flipud=0.5`);
     - **Mix & Occlusion Simulation**: Full Mosaic 1.0, MixUp 0.2, Random Erasing 0.4 (simulating manipulator arm shadows and player hands), and Copy-Paste 0.2;
-    - **Photometric Perturbations**: HSV saturation ($\pm 50\%$) and value ($\pm 40\%$) perturbations to strip specular reflections;
+    - **Photometric Perturbations**: HSV saturation (±50%) and value (±40%) perturbations to strip specular reflections;
   - **3. Class Loss Re-weighting & Label Smoothing Regularization**:
     Applied `cls=2.5` to prioritize classification gradients over stroke-similar characters, with `label_smoothing=0.1` to mitigate overconfident over-fitting.
 - **Physical Bottlenecks & Domain Shift**:
@@ -233,13 +233,13 @@ The vision perception pipeline was independently developed by Liu Chaoran across
   - **2. Radial Vector Outward Extrusion ROI Polygon Mask (`expanded_roi`)**:
     Computes radial unit vectors from the board centroid $\mathbf{C}$: $\mathbf{u}_i = \frac{\mathbf{P}_i - \mathbf{C}}{\|\mathbf{P}_i - \mathbf{C}\|}$, extruding corners outward by a 60px safety margin. Binary polygon masking (`cv2.fillPoly` + `cv2.bitwise_and`) zeroes out everything outside the board, **completely blocking ghost detections from captured pieces in the right-side Graveyard**;
   - **3. MOG2 Dynamic Hand Occlusion Detector (`find_chess.py`)**:
-    Maintains a 500-frame background model with variance threshold 120, operating on downsampled $640 \times 360$ frames. Intersecting foreground motion contours with the board ROI triggers `is_occluded = True` whenever contour area exceeds $2000\,\text{px}^2$, locking board updates while hands are in view;
+    Maintains a 500-frame background model with variance threshold 120, operating on downsampled $640 \times 360$ frames. Intersecting foreground motion contours with the board ROI triggers `is_occluded = True` whenever contour area exceeds $2000 px²$, locking board updates while hands are in view;
   - **4. Asynchronous Single-Buffer Zero-Latency VideoStream Engine & Hardware Failsafe**:
     A dedicated daemon thread pulls camera frames with driver buffer size clamped to 1 (`CAP_PROP_BUFFERSIZE = 1`), eliminating inter-thread frame queue lag. An internal `if vs.stopped: break` sentinel instantly terminates child threads upon emergency stop, preventing zombie camera processes;
   - **5. LAB Color Space CLAHE Adaptive Histogram Equalization**:
     Transforms frames to LAB color space, applying Contrast Limited Adaptive Histogram Equalization (`clipLimit=3.5, tileGridSize=(8, 8)`) to the L-channel, enhancing dark strokes and evening out asymmetric desk lamp illumination;
   - **6. 15px Core Margin Erosion & L-Channel Luminance Ratio Black Piece Classifier (`is_black_piece`)**:
-    Erodes detection bounding boxes inward by 15px (`y1+15:y2-15, x1+15:x2-15`) to isolate wooden rims and board gridlines. If deep black pixels ($L < 45$) exceed $50\%$ of the eroded core, the piece is classified as Black, fully immune to ambient colored illumination;
+    Erodes detection bounding boxes inward by 15px (`y1+15:y2-15, x1+15:x2-15`) to isolate wooden rims and board gridlines. If deep black pixels ($L < 45$) exceed 50% of the eroded core, the piece is classified as Black, fully immune to ambient colored illumination;
   - **7. Orientation Polarity Auto-Alignment (`set_black_view`)**:
     Calculates the mean Y coordinate of Black pieces at game setup: if Black is in the upper visual half (far side), Pt1 maps to A0; if Black is in the lower half (near side), Pt3 maps to A0, automatically handling 180° board rotation without manual configuration;
   - **8. Chu River Physical Deadzone Filtering**:
@@ -247,11 +247,11 @@ The vision perception pipeline was independently developed by Liu Chaoran across
   - **9. Dual-Threshold Confidence Gate with Hysteresis**:
     Sets entrance threshold `detect_conf = 0.50` and retention threshold `keep_conf = 0.20`, creating a Schmitt-trigger hysteresis loop that rejects transient false positives while maintaining persistent track of pieces under partial shadow;
   - **10. Centroid EMA Smoothing with 1.5px Deadzone**:
-    Updates tracked centroids via Exponential Moving Average ($\alpha = 0.28$) with a 1.5px Euclidean deadzone ($\text{dist}^2 > 2.25\,\text{px}^2$), eliminating sensor thermal subpixel noise and arm vibration;
+    Updates tracked centroids via Exponential Moving Average ($\alpha = 0.28$) with a 1.5px Euclidean deadzone ($\text{dist}^2 > 2.25\text{ px}^2$), eliminating sensor thermal subpixel noise and arm vibration;
   - **11. Teleportation Fast-Move Bypass (`find2.txt`)**:
-    When squared centroid displacement exceeds $\Delta d^2 > 2500\,\text{px}^2$, the algorithm flags rapid human manipulation, bypassing EMA filtering to instantly register new physical coordinates without trajectory lag;
+    When squared centroid displacement exceeds $\Delta d^2 > 2500\text{ px}^2$, the algorithm flags rapid human manipulation, bypassing EMA filtering to instantly register new physical coordinates without trajectory lag;
   - **12. Global Motion Gating**:
-    When any piece displacement satisfies $\Delta d^2 > 25\,\text{px}^2$, sets `global_motion = True` and flushes the sliding stabilization window, ensuring no partial moves are committed;
+    When any piece displacement satisfies $\Delta d^2 > 25\text{ px}^2$, sets `global_motion = True` and flushes the sliding stabilization window, ensuring no partial moves are committed;
   - **13. Piece Energy Tracking & 12-Frame Historical Majority Voting**:
     Maintains an energy accumulator for each track ID ($+40$ on detection, $-15$ on miss, activation at 50). A 12-frame double-ended queue (`deque(maxlen=12)`) performs majority voting (`Counter.most_common(1)`) to lock discrete grid positions against single-frame flickers;
   - **14. Active Visual Suppression During Robotic Manipulation (`suppress_detection`)**:
@@ -332,7 +332,7 @@ Squares occupied by the respective piece evaluate to $1.0$, while vacant squares
   - The 8100-dimensional action space spans all directional transfers between 90 board squares ($90 \times 90 = 8100$), indexed as:
     $$\text{idx} = (y_1 \times 9 + x_1) \times 90 + (y_2 \times 9 + x_2)$$
   - **Action Masking**: Inference filters outputs strictly over the candidate set returned by the rule engine:
-    $$a^* = \arg\max_{m \in \text{valid\_moves}} \text{Logits}[\text{idx}(m)]$$
+    $$a^* = \arg\max_{m \in \mathcal{M}_{\text{valid}}} \text{Logits}[\text{idx}(m)]$$
     completely preventing illegal move execution;
 - **High-Availability Graceful Degradation**:
   If the pretrained weight file `aaa.pth` is absent, the decision engine degrades gracefully to a uniform random policy (`random.choice(valid_moves)`), preventing system lockups during demonstrations.
@@ -348,7 +348,7 @@ The physical hardware electrical topology is organized below:
 
 | Module | Physical Interface | Protocol | Host Pins | Parameters & Electrical Specs |
 | :--- | :--- | :--- | :--- | :--- |
-| **PCA9685 Servo Driver** | SDA / SCL | Hardware I2C (100kHz Standard) | CH347 D0(SCL) / D1(SDA) | 16-ch 12-bit PWM, 50Hz ( $T = 20\,\text{ms}$ ) |
+| **PCA9685 Servo Driver** | SDA / SCL | Hardware I2C (100kHz Standard) | CH347 D0(SCL) / D1(SDA) | 16-ch 12-bit PWM, 50Hz ( $T = 20$ ms ) |
 | **Base Yaw (J1)** | PWM Channel 0 | 50Hz PWM | PCA9685 Output 0 | RDS3235 Metal Servo, Azimuth |
 | **Shoulder Pitch (J2)** | PWM Channel 4 | 50Hz PWM | PCA9685 Output 4 | RDS3235 35kg·cm High-Torque Servo, Lift |
 | **Elbow Pitch (J3)** | PWM Channel 8 | 50Hz PWM | PCA9685 Output 8 | 20kg·cm Digital Metal Servo, Radius & Elevation |
@@ -358,16 +358,16 @@ The physical hardware electrical topology is organized below:
 | **WCH CH347 Bridge** | USB Type-C | 480Mbps High-Speed USB | PC USB Port | Hardware USB to I2C/GPIO bridge |
 
 ### PCA9685 12-Bit PWM Mapping Model
-Operating at $T = 20\,\text{ms}$ (50Hz), the pulse width converts to register ticks via:
+Operating at $T = 20$ ms (50Hz), the pulse width converts to register ticks via:
 
 $$
-\text{Tick} = \left\lfloor \frac{T_{\text{pulse}}(\text{ms})}{20\,\text{ms}} \times 4096 \right\rfloor
+\text{Tick} = \left\lfloor \frac{T_{\text{pulse}}}{20\text{ ms}} \times 4096 \right\rfloor
 $$
 
-For RDS3235 servos ( $\theta \in [0^\circ, 270^\circ]$ , pulse width $0.5 \sim 2.5\,\text{ms}$ ):
+For RDS3235 servos ( $\theta \in [0^\circ, 270^\circ]$ , pulse width 0.5 ~ 2.5 ms ):
 
 $$
-T_{\text{pulse}}(\theta) = 0.5\,\text{ms} + \frac{\theta}{270^\circ} \times 2.0\,\text{ms}
+T_{\text{pulse}}(\theta) = 0.5\text{ ms} + \frac{\theta}{270^\circ} \times 2.0\text{ ms}
 $$
 
 $$
