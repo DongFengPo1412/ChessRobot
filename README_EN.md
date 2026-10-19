@@ -129,7 +129,7 @@ The manipulator features a 4-DOF articulated serial configuration: Base Yaw (J1)
 #### 2. Motion Control Algorithmic Catalog
 
 - **Algorithm 1: Analytical Closed-Form Inverse Kinematics (IK) Formulation**:
-  - **Core Principle**: To prevent numerical divergence, singularities, and millisecond-level iterative latencies inherent in numerical Jacobian methods, the spatial 3D Cartesian coordinates are decoupled into the **horizontal yaw plane** and the **vertical pitch plane**. Subject to the vertical wrist constraint ($\phi = -90^\circ$), the Law of Cosines directly yields an analytical closed-form solution with < 0.1 ms computational overhead;
+  - **Core Principle**: To prevent numerical divergence, singularities, and millisecond-level iterative latencies inherent in numerical Jacobian methods, the spatial 3D Cartesian coordinates are decoupled into the **horizontal yaw plane** and the **vertical pitch plane**. Subject to the vertical wrist constraint ( $\phi = -90^\circ$ ), the Law of Cosines directly yields an analytical closed-form solution with < 0.1 ms computational overhead;
   - **Mathematical Modeling**:
     - **Base Yaw Angle**:
       $$\theta_1 = \text{atan2}(X_{\text{comp}}, Y), \quad t_1^{\text{deg}} = \text{degrees}(\theta_1) + 90.0^\circ$$
@@ -156,20 +156,24 @@ The manipulator features a 4-DOF articulated serial configuration: Base Yaw (J1)
 - **Algorithm 3: 5-Phase Micro-Approach Collision-Free Trajectory Planning (`control.py`)**:
   - **Core Principle**: Given the tight 35 mm grid spacing versus ≈ 30 mm piece diameters (leaving < 5 mm clearance), diagonal suction descent inevitably knocks over adjacent pieces. Trajectories are discretized into 5 sequential 3D waypoints:
     1. **Cruise Transit**: Rapid horizontal transit at safe cruise elevation $Z_{\text{safe}} = 70.0$ mm;
-    2. **Micro-Approach Hover**: Vertical descent to hover 8mm above piece surface ($Z_{\text{micro}} = -25.0$ mm), holding 0.3s for wrist plumb stabilization;
+    2. **Micro-Approach Hover**: Vertical descent to hover 8mm above piece surface ( $Z_{\text{micro}} = -25.0$ mm ), holding 0.3s for wrist plumb stabilization;
     3. **Slow Vertical Plunge & Magnetization**: Slow vertical insertion to board level $Z_{\text{board}} = -33.0$ mm, energizing the electromagnet with a 0.5s dwell for magnetic flux coupling;
     4. **Elbow-Driven Pure Vertical Lift**: Slow, strictly vertical 8mm lift back to $Z_{\text{micro}}$, eliminating diagonal shear that trips neighboring pieces;
     5. **Cruise Transfer & Symmetrical Release**: Vertical ascent to $Z_{\text{safe}}$, transit to target grid point, followed by identical vertical plunge, demagnetization, and vertical retraction;
   - **Capture Sequencing**: When capturing an opponent piece, the planner first commands acquisition and disposal of the victim piece into the external Graveyard ((220, 120, BOARD_Z + 20)) before executing the attacker's trajectory.
 
 - **Algorithm 4: 50Hz Trajectory Interpolation with 0.1mm Float Deadzone Control (`move_to_smooth`)**:
-  - **Core Principle**: The interpolator evaluates intermediate steps at 50Hz ($\text{steps} = \text{duration} \times 50$). During pure vertical travel, floating-point roundoff in inverse trigonometry produces spurious $10^{-4}$ mm lateral deltas, causing high-frequency chatter in the base servo;
+  - **Core Principle**: The interpolator evaluates intermediate steps at 50Hz (`steps = int(duration * 50)`). During pure vertical travel, floating-point roundoff in inverse trigonometry produces spurious $10^{-4}$ mm lateral deltas, causing high-frequency chatter in the base servo;
   - **Deadzone Formulation**:
-    $$\Delta X_{\text{step}} = \begin{cases} \frac{X_{\text{target}} - X_{\text{cur}}}{\text{steps}}, & \text{if } |X_{\text{target}} - X_{\text{cur}}| > 0.1\text{ mm} \\ 0.0, & \text{otherwise} \end{cases}$$
+
+    $$
+    \Delta X_{\text{step}} = \frac{X_{\text{target}} - X_{\text{cur}}}{\text{steps}} \quad (\text{if } |X_{\text{target}} - X_{\text{cur}}| > 0.1\text{ mm, else } 0.0)
+    $$
+
     Clamping sub-0.1mm increments strictly to zero cuts off horizontal servo pulses, ensuring pristine vertical descent.
 
 - **Algorithm 5: 12-Bit PCA9685 PWM Quantization & Hardware Driver Mapping (`hardware.py`)**:
-  - **Core Principle**: Commanded via CH347 High-Speed USB bridge over 100KHz I2C bus. The PCA9685 prescaler is set to 121 for a 50 Hz carrier ($T = 20$ ms);
+  - **Core Principle**: Commanded via CH347 High-Speed USB bridge over 100KHz I2C bus. The PCA9685 prescaler is set to 121 for a 50 Hz carrier ( $T = 20$ ms );
   - **Pulse-to-Tick Mapping**:
     $$\text{tick} = \left\lfloor \frac{\text{clamp}(u, u_{\min}, u_{\max})}{20000} \times 4096 \right\rfloor$$
     Maps microsecond pulse widths into 12-bit registers written in multi-byte blocks, while native CH347 GPIO2 drives the relay circuit with nanosecond switching response.
@@ -228,7 +232,7 @@ The vision perception pipeline was independently developed by Liu Chaoran across
   Facing delivery deadlines and unrectified oblique stroke ambiguity, the YOLO task was strategically reduced to **single-class piece localization (`nc: 1, names: ['piece']`) combined with color and topological tracking**; centers were mapped via planar homography to the 10×9 discrete grid, reporting displacement differentials (`e6 -> e4`) to the decision engine.
 - **Proprietary Engineering Algorithm Matrix (16 Core Mechanisms)**:
   To eliminate noise from table vibration, ambient reflection, human hand occlusion, and capture state invalidation, Generation 3 deployed a robust matrix of 16 algorithms:
-  - **1. Clockwise 4-Point SVD Homography Matrix Estimation ($\mathbf{H}$)**:
+  - **1. Clockwise 4-Point SVD Homography Matrix Estimation ( $\mathbf{H}$ )**:
     Clockwise corner selection (TL $\to$ TR $\to$ BR $\to$ BL) computes the homography matrix $\mathbf{H}$ via Singular Value Decomposition (SVD), mapping oblique camera pixels directly to the normalized $10 \times 9$ discrete board matrix;
   - **2. Radial Vector Outward Extrusion ROI Polygon Mask (`expanded_roi`)**:
     Computes radial unit vectors from the board centroid $\mathbf{C}$: $\mathbf{u}_i = \frac{\mathbf{P}_i - \mathbf{C}}{\|\mathbf{P}_i - \mathbf{C}\|}$, extruding corners outward by a 60px safety margin. Binary polygon masking (`cv2.fillPoly` + `cv2.bitwise_and`) zeroes out everything outside the board, **completely blocking ghost detections from captured pieces in the right-side Graveyard**;
@@ -239,27 +243,27 @@ The vision perception pipeline was independently developed by Liu Chaoran across
   - **5. LAB Color Space CLAHE Adaptive Histogram Equalization**:
     Transforms frames to LAB color space, applying Contrast Limited Adaptive Histogram Equalization (`clipLimit=3.5, tileGridSize=(8, 8)`) to the L-channel, enhancing dark strokes and evening out asymmetric desk lamp illumination;
   - **6. 15px Core Margin Erosion & L-Channel Luminance Ratio Black Piece Classifier (`is_black_piece`)**:
-    Erodes detection bounding boxes inward by 15px (`y1+15:y2-15, x1+15:x2-15`) to isolate wooden rims and board gridlines. If deep black pixels ($L < 45$) exceed 50% of the eroded core, the piece is classified as Black, fully immune to ambient colored illumination;
+    Erodes detection bounding boxes inward by 15px (`y1+15:y2-15, x1+15:x2-15`) to isolate wooden rims and board gridlines. If deep black pixels ( $L < 45$ ) exceed 50% of the eroded core, the piece is classified as Black, fully immune to ambient colored illumination;
   - **7. Orientation Polarity Auto-Alignment (`set_black_view`)**:
     Calculates the mean Y coordinate of Black pieces at game setup: if Black is in the upper visual half (far side), Pt1 maps to A0; if Black is in the lower half (near side), Pt3 maps to A0, automatically handling 180° board rotation without manual configuration;
   - **8. Chu River Physical Deadzone Filtering**:
-    Enforces a spatial deadzone across the river divide ($4.35 < y < 4.65$), discarding spurious bounding boxes triggered by decorative calligraphy printed in the center river;
+    Enforces a spatial deadzone across the river divide ( $4.35 < y < 4.65$ ), discarding spurious bounding boxes triggered by decorative calligraphy printed in the center river;
   - **9. Dual-Threshold Confidence Gate with Hysteresis**:
     Sets entrance threshold `detect_conf = 0.50` and retention threshold `keep_conf = 0.20`, creating a Schmitt-trigger hysteresis loop that rejects transient false positives while maintaining persistent track of pieces under partial shadow;
   - **10. Centroid EMA Smoothing with 1.5px Deadzone**:
-    Updates tracked centroids via Exponential Moving Average ($\alpha = 0.28$) with a 1.5px Euclidean deadzone ($\text{dist}^2 > 2.25\text{ px}^2$), eliminating sensor thermal subpixel noise and arm vibration;
+    Updates tracked centroids via Exponential Moving Average ( $\alpha = 0.28$ ) with a 1.5px Euclidean deadzone ( $\text{dist}^2 > 2.25\text{ px}^2$ ), eliminating sensor thermal subpixel noise and arm vibration;
   - **11. Teleportation Fast-Move Bypass (`find2.txt`)**:
     When squared centroid displacement exceeds $\Delta d^2 > 2500\text{ px}^2$, the algorithm flags rapid human manipulation, bypassing EMA filtering to instantly register new physical coordinates without trajectory lag;
   - **12. Global Motion Gating**:
     When any piece displacement satisfies $\Delta d^2 > 25\text{ px}^2$, sets `global_motion = True` and flushes the sliding stabilization window, ensuring no partial moves are committed;
   - **13. Piece Energy Tracking & 12-Frame Historical Majority Voting**:
-    Maintains an energy accumulator for each track ID ($+40$ on detection, $-15$ on miss, activation at 50). A 12-frame double-ended queue (`deque(maxlen=12)`) performs majority voting (`Counter.most_common(1)`) to lock discrete grid positions against single-frame flickers;
+    Maintains an energy accumulator for each track ID (+40 on detection, -15 on miss, activation at 50). A 12-frame double-ended queue (`deque(maxlen=12)`) performs majority voting (`Counter.most_common(1)`) to lock discrete grid positions against single-frame flickers;
   - **14. Active Visual Suppression During Robotic Manipulation (`suppress_detection`)**:
     While the robot arm is executing trajectory waypoints, the orchestrator sets `suppress_detection = True`, masking camera feed to prevent the arm link and its shadow from being parsed as human moves. Calls `reset_baseline()` once parked;
   - **15. Dual Occupancy & Track-ID Displacement Differential (`main.py`)**:
     Resolves piece capture where an attacking piece replaces a victim piece on the same square by evaluating `pos not in current_board` alongside `last_stable_board[pos] != tid`, gracefully separating source and destination while trapping edge-case ID collisions;
   - **16. UI 2x Lossless Coordinate Mapping (`ui_main.py`)**:
-    Locks the video rendering viewport to $640 \times 360$ (exact 16:9 ratio of $1280 \times 720$). Mouse click calibration events are multiplied by 2 to map losslessly back to raw sensor pixels, eliminating coordinate drift caused by window resizing.
+    Locks the video rendering viewport to $640 \times 360$ (exact 16:9 ratio of $1280 \times 720$ ). Mouse click calibration events are multiplied by 2 to map losslessly back to raw sensor pixels, eliminating coordinate drift caused by window resizing.
 - **Capture State Deadlock & Semi-Automatic Spacebar State Machine**:
   - **Deadlock Caused by Unidentified Characters**: Because the reduced-dimension model localized bounding boxes without recognizing character identities, the algorithm had **no way of identifying which piece disappeared**. When piece count dropped from 32 to 31 upon capture, the system could not programmatically distinguish between a genuine capture and a temporary hand-occlusion dropout, breaking piece-conservation invariants;
   - **Human-in-the-Loop State Machine Compromise**: Resolved by introducing a **"Player Move Confirmation Button / Keyboard Spacebar"** in the UI. After completing a move and retracting hands, the human player hits the spacebar (`force_detect_move = True`). The system samples the static board free of hand shadows. This guaranteed 100% operational reliability for class delivery, though at the expense of **inability to recognize arbitrary mid-game layouts** and **reliance on manual keystroke confirmation**.
@@ -271,7 +275,7 @@ The vision perception pipeline was independently developed by Liu Chaoran across
   - **1. Single-Piece Micro-Crop & Alpha Mask Library**:
     Photographed all 32 custom magnetic pieces under high magnification, generating clean transparent cutouts with preserved alpha masks across all 14 Chinese chess piece classes, alongside clean empty-board reference images;
   - **2. Automated Board Synthesis & Ground Truth Tensor Generator (`CChessMixSinglePngCls`)**:
-    Built an automated synthesis pipeline applying randomized affine perturbations, orientation angles ($\pm 15^\circ$), and HSV photometric noise to composite individual piece cutouts across the 90 intersections (A0 to J8). Automatically produces synchronized $10 \times 9 \times 16$ Ground Truth label tensors, synthesizing tens of thousands of diverse mid-game scenarios with zero manual labeling overhead;
+    Built an automated synthesis pipeline applying randomized affine perturbations, orientation angles ( $\pm 15^\circ$ ), and HSV photometric noise to composite individual piece cutouts across the 90 intersections (A0 to J8). Automatically produces synchronized $10 \times 9 \times 16$ Ground Truth label tensors, synthesizing tens of thousands of diverse mid-game scenarios with zero manual labeling overhead;
   - **3. RTMPose-Tiny 4-Corner Pose Regression & Automatic Rectification (`cchess_pose`)**:
     A lightweight coordinate-classification pose network (RTMCC) regresses the 4 board corners (A0, A8, J0, J8) directly from raw oblique camera feeds, automatically performing inverse perspective mapping to render standardized top-down orthographic images;
   - **4. Swin-Transformer V2 Hierarchical Global Feature Backbone (`cchess_reg`)**:
@@ -298,9 +302,9 @@ Implements the comprehensive rule set of Chinese Chess, providing legal move val
 - **Raycast Obstacle Collision (Chariot/Cannon)**:
   `is_path_clear` steps through collinear intersections:
   - **Chariot (Ju)**: Requires collinear source and target with intervening obstacle count $N_{\text{obs}} = 0$;
-  - **Cannon (Pao)**: Move without capture requires $N_{\text{obs}} = 0$ onto an empty square; capture strictly mandates **exactly one cannon mount ($N_{\text{obs}} = 1$)** onto an opponent piece;
+  - **Cannon (Pao)**: Move without capture requires $N_{\text{obs}} = 0$ onto an empty square; capture strictly mandates **exactly one cannon mount ( $N_{\text{obs}} = 1$ )** onto an opponent piece;
 - **Horse Leg Obstacle Detection (`is_ma_valid`)**:
-  Enforces $|dx| \times |dy| = 2$. If moving horizontally ($|dx|=2$), verifies that midpoint $(y_1, \frac{x_1 + x_2}{2})$ is empty; if moving vertically ($|dy|=2$), verifies that midpoint $(\frac{y_1 + y_2}{2}, x_1)$ is empty;
+  Enforces $|dx| \times |dy| = 2$. If moving horizontally ( $|dx|=2$ ), verifies that midpoint $(y_1, \frac{x_1 + x_2}{2})$ is empty; if moving vertically ( $|dy|=2$ ), verifies that midpoint $(\frac{y_1 + y_2}{2}, x_1)$ is empty;
 - **Elephant Eye & River Boundary Constraints (`is_xiang_valid`)**:
   Enforces $|dx|=2, |dy|=2$ with unblocked center $(\frac{y_1 + y_2}{2}, \frac{x_1 + x_2}{2})$. Red elephants are constrained to $y_2 \ge 5$, while Black elephants are constrained to $y_2 \le 4$;
 - **Advisor Palace Diagonal Constraints (`is_shi_valid`)**:
@@ -308,8 +312,8 @@ Implements the comprehensive rule set of Chinese Chess, providing legal move val
 - **General Orthogonal Movement & Flying General Rule (`is_jiang_valid`)**:
   Restricted to $|dx| + |dy| = 1$ within the palace; enforces the "Flying General" prohibition against unobstructed collinear generals;
 - **Soldier Forward / Lateral River Transition State Machine (`is_zu_valid`)**:
-  - Red Soldier: Prior to crossing river ($y_1 > 4$), only forward motion allowed ($dx=0, dy=-1$); after crossing ($y_1 \le 4$), allows forward or lateral moves ($dy=-1$ or $dy=0, |dx|=1$), backward moves forbidden;
-  - Black Soldier: Prior to crossing river ($y_1 < 5$), only forward motion allowed ($dx=0, dy=1$); after crossing ($y_1 \ge 5$), allows forward or lateral moves ($dy=1$ or $dy=0, |dx|=1$), backward moves forbidden;
+  - Red Soldier: Prior to crossing river ( $y_1 > 4$ ), only forward motion allowed ( $dx=0, dy=-1$ ); after crossing ( $y_1 \le 4$ ), allows forward or lateral moves ( $dy=-1$ or $dy=0, |dx|=1$ ), backward moves forbidden;
+  - Black Soldier: Prior to crossing river ( $y_1 < 5$ ), only forward motion allowed ( $dx=0, dy=1$ ); after crossing ( $y_1 \ge 5$ ), allows forward or lateral moves ( $dy=1$ or $dy=0, |dx|=1$ ), backward moves forbidden;
 - **Full Legal Move Enumeration (`get_all_legal_moves`) & Undo Stack**:
   Scans all active pieces to enumerate all valid actions across 90 intersections, driving AI decision trees and checkmate verification.
 
@@ -329,7 +333,7 @@ Squares occupied by the respective piece evaluate to $1.0$, while vacant squares
     - $\text{Linear1}: 11,520 \to 1024$ (ReLU)
     - $\text{Linear2}: 1024 \to 8100$ (Unnormalized Logits)
 - **Action Space Indexing & Legal-Move Masking**:
-  - The 8100-dimensional action space spans all directional transfers between 90 board squares ($90 \times 90 = 8100$), indexed as:
+  - The 8100-dimensional action space spans all directional transfers between 90 board squares ( $90 \times 90 = 8100$ ), indexed as:
     $$\text{idx} = (y_1 \times 9 + x_1) \times 90 + (y_2 \times 9 + x_2)$$
   - **Action Masking**: Inference filters outputs strictly over the candidate set returned by the rule engine:
     $$a^* = \arg\max_{m \in \mathcal{M}_{\text{valid}}} \text{Logits}[\text{idx}(m)]$$
