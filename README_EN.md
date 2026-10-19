@@ -47,7 +47,9 @@
 This platform integrates custom physical fixtures, embedded drivers, vision recognition, and robotic trajectory control.
 
 ### 1.1 Physical Chessboard & Handcrafted Magnetic Pieces
-- **Custom Chessboard**: Selected a $35 \times 35\,\text{cm}$ beige portable soft Chinese chessboard (flexible mat) with crisp grid lines, optimal reflectance, and high-precision line spacing.
+- **Physical Chessboard Selection & Mechanical Evolution**:
+  - **Eliminated Initial Version ( $40 \times 40\,\text{cm}$ Dark Green Flexible Mat )**: Initially procured a $40 \times 40\,\text{cm}$ dark green flexible soft chessboard. However, during kinematic integration with the 4-DOF manipulator, mechanical workspace limits (upper arm $L_2 = 231\,\text{mm}$, forearm $L_3 = 231\,\text{mm}$) prevented the electromagnetic end-effector from reaching outer edge intersections on the furthest 9th rank (Red baseline), exceeding the arm's reach limit and forcing its prompt elimination;
+  - **Standardized Production Version ( $35 \times 35\,\text{cm}$ Beige Flexible Mat )**: Replaced with a custom $35 \times 35\,\text{cm}$ beige portable soft Chinese chessboard (flexible mat). The grid center-to-center spacing is compressed to approx. $34.2\,\text{mm}$ (strictly matching `SQUARE_WIDTH = 34.2` and `BOARD_ORIGIN_Y = 200.0` in `config.py`), enabling the robotic arm to reliably and smoothly cover all 90 grid intersections across the entire board.
 - **Handmade Magnetic Pieces**:
   - Printed high-contrast red and black Chinese chess character templates (Microsoft YaHei font, bold) sized at exactly $3.0\,\text{cm}$ diameter;
   - Manually precision-cut all 32 character circles;
@@ -204,10 +206,17 @@ Liu Chaoran independently spearheaded 100% of dataset collection, annotation, an
   - **Hyper-Sensitivity of Geometric Tuning**: Hough circle detection was hypersensitive to ambient lighting and glares. Lowering sensitivity caused severe false negatives under shadows, while raising sensitivity produced swarming false-positive circles from reflections. During pure visual bench validation—prior to any robotic arm integration—the approach was abandoned due to unacceptable error rates.
 
 #### Generation 2 Evolution (Gen 2: Fine-Tuned YOLOv11 14-Class Detection)
-- **Concept**: Abandoned classical geometric operators in favor of deep learning. Photographed 620 authentic chessboard images under diverse lighting, angles, empty boards, mid-game positions, and partial occlusions; manually annotated 14 piece classes on **Roboflow** (32 pieces/board); fine-tuned a YOLOv11n model on a local **RTX 4060** GPU (70% train, 20% val, 10% test).
-- **Practical Performance & Physical Root Cause**:
+- **Concept & Overhead Dataset Acquisition**:
+  Abandoned classical geometric operators in favor of deep learning. An overhead industrial camera was rigidly mounted to a dedicated metallic bracket on the system base frame at a working altitude of approx. $40\,\text{cm}$ (`collect_real_data.py`), photographing 620 authentic chessboard images under diverse lighting, angles, empty boards, mid-game positions, and partial occlusions; manually annotated 14 piece classes on **Roboflow** (32 pieces/board); fine-tuned a YOLOv11n model on a local **RTX 4060** GPU (70% train, 20% val, 10% test).
+- **Extreme Data Augmentation Pipeline**:
+  To combat harsh specular reflections and boost model robustness, a comprehensive data augmentation pipeline was deployed in `train.py`:
+  - **Geometric & Affine Transformations**: $\pm 45^\circ$ board rotation (`degrees=45.0`), $\pm 15\%$ spatial translation, $\pm 60\%$ multi-scale scaling, $\pm 15^\circ$ shear, and random horizontal/vertical flips (`fliplr/flipud=0.5`);
+  - **Occlusion & Composition Augmentations**: Mosaic tiling (1.0), MixUp (0.2), random erasing to simulate hand shadows and reflections (`erasing=0.4`), and Copy-Paste (0.2);
+  - **Photometric Variations**: Random HSV saturation (0.5) and value (0.4) perturbations to adapt to non-uniform ambient illumination.
+- **Practical Performance & Cross-Board Domain Shift**:
   - **Superb Target Localization**: Piece detection recall and center localization accuracy jumped dramatically, completely eliminating the false-positive circle artifacts of Hough detection;
-  - **Physical Root Cause of High Character Error**: **Planar orthographic projection unwarping was not yet introduced (lack of homography perspective rectification)**. In experimental setups, the camera was handheld or mounted at varying elevations and oblique angles, lacking a standardized physical scale and top-down orientation. Distant piece strokes were heavily compressed and distorted, causing severe confusion between visually similar characters (e.g., **Chariot 車 vs. Pawn 卒**, **Horse 馬 vs. Soldier 兵**), with only a few salient characters recognized accurately. With 0% error tolerance in gameplay, this model could not support autonomous game decisions.
+  - **Severe Cross-Board Domain Shift**: Of the 620 annotated images, **approx. 500 were photographed on the early eliminated dark green board**. Following the switch to the beige soft mat, due to tight delivery deadlines, only 120 additional images could be collected. The radical shift in background color (dark green vs. light beige) introduced severe domain shift, significantly limiting generalization on the finalized board;
+  - **Physical Root Cause of High Character Error**: **Planar orthographic projection unwarping was not yet introduced (lack of homography perspective rectification)**. Distant piece strokes from the oblique overhead angle suffered from perspective compression, causing severe confusion between visually similar characters (e.g., **Chariot 車 vs. Pawn 卒**, **Horse 馬 vs. Soldier 兵**), with only a few salient characters recognized accurately. With 0% error tolerance in gameplay, this model could not support autonomous game decisions.
 
 <div align="center">
   <img src="docs/images/vision_pipeline_evolution.png" width="820px" alt="Roboflow Chessboard Annotation Workspace"/>
@@ -219,9 +228,20 @@ Liu Chaoran independently spearheaded 100% of dataset collection, annotation, an
   - Faced with tight deadlines and the physical bottleneck of unwarped character classification, made a decisive engineering trade-off: abandoned complex 14-class character recognition, downscaling YOLO to **piece localization + red/black team binary classification**;
   - The dataset required only two target classes ("Red" and "Black"), achieving rapid training convergence. **Target localization and red/black classification achieved near-zero error and exceptional stability during live matches**;
   - Combined with homography perspective transformation (mapping center coordinates to the physical 10×9 grid), vision passed only the coordinate difference before and after a move (e.g., `e6 -> e4`) to the decision brain.
-- **Piece-Capture Deadlock & Semi-Autonomous Compromise**:
-  - **Piece-Capture Breakdown of Sliding-Window Stability**: The original algorithm relied on the conservation of all 32 pieces as the steady-state baseline for sliding-window filtering. Upon a piece capture, the count permanently dropped to 31, preventing the system from distinguishing between a legitimate capture and temporary hand occlusion;
-  - **Human-in-the-Loop State Machine**: Implemented an operator UI button / hotkey interface (Key `1` for Black on top, Key `2` for Black on bottom, and Move Confirm / Space Bar). After completing a move and retracting hands, the player pressed confirm to trigger difference extraction in a clean, shadow-free frame. This guaranteed 100% live match reliability, but introduced two compromises: **no endgame support** (required standard 32-piece opening) and **reliance on manual keystrokes (semi-autonomous)**.
+- **Core Engineering Algorithms & Visual Pipeline**:
+  - **4-Point Homography & 60px ROI Masking (Graveyard Dead-Piece Isolation)**:
+    Clockwise calibration clicks (Top-Left $\to$ Top-Right $\to$ Bottom-Right $\to$ Bottom-Left) compute an outward 60px buffer (`roi_buffer_px = 60`, approx. 2-3cm). Using `cv2.fillPoly` and `cv2.bitwise_and`, an ROI mask is generated, zeroing out everything outside the board. When the robot arm captures pieces and deposits them in the external right-hand Graveyard (`GRAVEYARD_XYZ = (220, 120, config.BOARD_Z+20)`), **all captured dead pieces outside the board are blocked by the ROI mask, completely preventing false positive ghost detections!**
+  - **Asynchronous Single-Buffer Low-Latency Video Stream (`VideoStream`)**:
+    Encapsulates OpenCV video capture in a dedicated daemon thread, forcing driver buffer size to 1 (`CAP_PROP_BUFFERSIZE = 1`). This eliminates multi-threaded frame queue accumulation and latency, guaranteeing real-time 0-delay 720p frames for inference;
+  - **CLAHE Adaptive Histogram Equalization Preprocessing**:
+    Transforms frames to LAB color space, applying Contrast Limited Adaptive Histogram Equalization (`clipLimit=3.5`) to the L channel before returning to BGR, boosting stroke contrast and overcoming ambient shadows;
+  - **Chu River Physical Deadzone Filtering (Ghost Detection Filter)**:
+    Establishes a physical deadzone across the open Chu River boundary ( $4.35 < y < 4.65$ between ranks 4 and 5 ), immediately rejecting false-positive boxes caused by decorative calligraphy printed on the board;
+  - **Dual-Threshold Confidence & EMA Coordinate Anti-Jitter**:
+    Employs a detection entry threshold of `detect_conf = 0.50` and tracking survival threshold of `keep_conf = 0.20`, coupled with Exponential Moving Average ( $\alpha = 0.28$ ) and a 1.5-pixel deadzone (`dist_sq > 2.25`) to eliminate pixel jitter and protect joint servos.
+- **Unidentified Characters & Piece-Capture Deadlock Resolution**:
+  - **Deadlock Caused by Unrecognized Characters**: Because the downscaled model did not classify Chinese character roles and only tracked occupancy coordinates, the system had **no semantic knowledge of which specific piece disappeared**. When a capture reduced the piece count from 32 to 31, the algorithm could not determine whether a piece was legitimately captured or temporarily occluded by hand shadows, breaking the sliding-window conservation baseline;
+  - **Human-in-the-Loop State Machine**: Implemented an operator UI button / Spacebar confirmation mechanism. After completing a move and retracting hands, the human taps Space (`force_detect_move = True`). The system triggers difference extraction on a clean, stationary snapshot without hand occlusion. This achieved 100% operational reliability, with two compromises: **no endgame support** (required standard 32-piece opening) and **reliance on manual operator confirmation (semi-autonomous)**.
 
 #### Generation 4 Upgrade (Gen 4: Autonomous Research Breakthrough — Global Grid Tensor Classification)
 - **Autonomous Research & Paradigm Reconstruction**:
@@ -375,17 +395,17 @@ python tools/calc_reach.py
 
 ## 8. Operating Guide (Interactive Calibration & Play)
 
-1. **4-Point Homography Interactive Calibration**:
-   - On initial launch, click the four chessboard corners clockwise (1.Top-Left $\to$ 2.Top-Right $\to$ 3.Bottom-Right $\to$ 4.Bottom-Left) in the camera feed;
-   - SVD solves matrix $\mathbf{H}$, establishing homography mapping from pixels to physical millimeters.
-2. **Setup Initial Board**:
-   - Place all 32 handmade magnetic pieces on the beige board at standard opening coordinates;
-   - Tap `Start Match` on the GUI to lock the baseline.
+1. **Four-Point Homography Interactive Calibration & ROI Locking**:
+   - Upon system launch, click the 4 physical board boundary corners clockwise in the PyQt5 dashboard (1.Top-Left $\to$ 2.Top-Right $\to$ 3.Bottom-Right $\to$ 4.Bottom-Left);
+   - The system computes homography matrix $\mathbf{H}$ via SVD decomposition and generates an expanded 60px ROI mask, completely isolating captured pieces in the external graveyard from vision inference.
+2. **Piece Setup & Game Initialization**:
+   - Place all 32 handmade magnetic pieces on the beige flexible mat in their standard opening positions;
+   - Click `Start Game` on the dashboard to lock the initial baseline board.
 3. **Human Move & Confirmation Trigger**:
-   - The human player moves Red; upon retracting hands, tap the **Space Bar** (or click **Move Done**);
-   - Vision verifies the displacement, pushing coordinates into `move_queue`, prompting AI to compute Black's move.
-4. **Autonomous Arm Execution**:
-   - The robotic arm departs standby, executing a 5-phase micro-approach trajectory: cruise arrival $\to$ 8mm hovering stabilization $\to$ vertical descent and magnetic suction $\to$ vertical 8mm lift $\to$ cruise transfer $\to$ precision placement and return to standby.
+   - Human player moves Red first; after completing the move and retracting hands, tap the **Keyboard Spacebar** (or click **Confirm Move** on the UI);
+   - Vision extracts displacement coordinates in a clean frame and pushes them to `move_queue`, prompting the AI engine to compute Black's optimal response.
+4. **Autonomous Manipulator Execution**:
+   - The arm departs standby to execute a 5-phase collision-free trajectory: cruise approach $\to$ 8mm micro-leveling $\to$ vertical pickup $\to$ vertical lift $\to$ cruise transfer $\to$ vertical placement at destination (transferring captured enemy piece to external graveyard if capturing) $\to$ smooth return to standby.
 
 ---
 
