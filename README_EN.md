@@ -193,8 +193,8 @@ The vision perception pipeline was independently developed by Liu Chaoran across
     Leveraged Sobel gradient vectors and accumulator space voting to detect circle boundaries, centers $(x_c, y_c)$, and radius $r$;
   - **2. HSV Color Space Bilateral Thresholding**:
     Decoupled luminance (V) from chrominance (H), applying bilateral hue threshold masks for red dual-peaks and black low-saturation clusters;
-  - **3. Automated Font Template Synthesis & Cascaded 2-Stage CNN OCR**:
-    Synthesized over 1,000 synthetic white-background red/black character images using Microsoft YaHei Bold, cascading circular ROI crops into the downstream CNN.
+  - **3. Modified Single-Channel ResNet-18 11-Class Classifier (`model.py`, `ChessResNet18`)**:
+    In the initial prototype codebase (`PythonProject1`), custom-engineered a modified ResNet-18 backbone (converting the initial convolution to single-channel grayscale `nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3)` and reshaping the fully connected classification head to `Linear(512, 256) -> ReLU -> Dropout(0.3) -> Linear(256, 11)`). Trained classification weights (`chess_resnet_gray.pth`) for 11 Chinese characters ("车", "马", "相", "士", "将", "炮", "卒", "兵", "帅", "象", "仕"), coupled with OpenCV font synthesis and keyboard hotkeys (s/x/m/p/b/j/t/i/c/a/z) for sample collection;
 - **Objective Root Causes of Retirement**:
   - **Synthetic-to-Real Domain Gap**: Training on synthetic font tiles collapsed in the real physical world (< 20% real-world accuracy);
   - **High-Altitude Scale Distortion**: The overhead camera rendered individual piece characters at very low pixel dimensions, severely blurring calligraphic strokes;
@@ -204,8 +204,8 @@ The vision perception pipeline was independently developed by Liu Chaoran across
 - **Concept & Overhead Dataset Engineering**:
   Abandoned classical heuristics in favor of deep object detection architectures. Designed a complete physical acquisition protocol:
 - **Gen 2 Algorithmic Catalog**:
-  - **1. 40cm Altitude Overhead Image Acquisition Protocol (`collect_real_data.py`)**:
-    Rigidly mounted the camera 40 cm above the board, collecting 620 high-altitude images (1280×720) across empty layouts, opening phases, mid-game, and hand-occluded states. Annotated 14 piece classes on **Roboflow** (32 pieces per image);
+  - **1. 40cm Altitude Overhead Image Acquisition Protocol (`collect_real_data.py`) & Dataset Evolution**:
+    Rigidly mounted the camera 40 cm above the board, collecting 620 high-altitude images (1280×720) across empty layouts, opening phases, mid-game, and hand-occluded states. On **Roboflow** (workspace `myrobot-wuh2o`, project `chess-robot-pose`), the dataset iterated from early `v1 (YOLOv8)` through `v8 (YOLOv11)` (>375 MB total volume), annotating 14 piece classes (32 pieces per board). Fine-tuned on local RTX 4060, producing checkpoints `Chess_V5_Ultimate_1280` and `Chess_V6_Pro_1280`;
   - **2. Extreme Hybrid Augmentation Pipeline (`train.py`)**:
     To maximize robustness under harsh ambient lab lighting, fine-tuned YOLOv11n on local **RTX 4060** using extreme data augmentations:
     - **Spatial Affine Transforms**: Arbitrary rotation $\pm 45^\circ$ (`degrees=45.0`), translation ±15%, scale ±60%, shear $\pm 15^\circ$, and random horizontal/vertical flips (`fliplr/flipud=0.5`);
@@ -225,7 +225,7 @@ The vision perception pipeline was independently developed by Liu Chaoran across
 
 #### Generation 3 Production (Gen 3: Strategic Dimensionality Reduction —— YOLO Localization + Red/Black Binary + Heuristic Matrix)
 - **Strategic Trade-off & Engineering Subtraction**:
-  Facing delivery deadlines and unrectified oblique stroke ambiguity, the YOLO task was strategically reduced to **single-class piece localization (`nc: 1, names: ['piece']`) combined with color and topological tracking**; centers were mapped via planar homography to the 10×9 discrete grid, reporting displacement differentials (`e6 -> e4`) to the decision engine.
+  Facing delivery deadlines and unrectified oblique stroke ambiguity, a dedicated batch conversion script `label change.py` (`convert_to_single_piece`) in prototype `PythonProject2` systematically rewritten all multi-class annotations into single-class `0` (`nc: 1, names: ['piece']`). The vision pipeline was strategically pivoted to **single-class ultra-precise geometric localization combined with color ratio and topological differential tracking**; centers were mapped via planar homography to the 10×9 discrete grid, reporting displacement differentials (`e6 -> e4`) to the decision engine.
 - **Proprietary Engineering Algorithm Matrix (16 Core Mechanisms)**:
   To eliminate noise from table vibration, ambient reflection, human hand occlusion, and capture state invalidation, Generation 3 deployed a robust matrix of 16 algorithms:
   - **1. Clockwise 4-Point SVD Homography Matrix Estimation ( $\mathbf{H}$ )**:
@@ -234,8 +234,8 @@ The vision perception pipeline was independently developed by Liu Chaoran across
     Computes radial unit vectors from the board centroid $\mathbf{C}$: $\mathbf{u}_i = \frac{\mathbf{P}_i - \mathbf{C}}{\|\mathbf{P}_i - \mathbf{C}\|}$, extruding corners outward by a 60px safety margin. Binary polygon masking (`cv2.fillPoly` + `cv2.bitwise_and`) zeroes out everything outside the board, **completely blocking ghost detections from captured pieces in the right-side Graveyard**;
   - **3. MOG2 Dynamic Hand Occlusion Detector (`find_chess.py`)**:
     Maintains a 500-frame background model with variance threshold 120, operating on downsampled $640 \times 360$ frames. Intersecting foreground motion contours with the board ROI triggers `is_occluded = True` whenever contour area exceeds $2000 px²$, locking board updates while hands are in view;
-  - **4. Asynchronous Single-Buffer Zero-Latency VideoStream Engine & Hardware Failsafe**:
-    A dedicated daemon thread pulls camera frames with driver buffer size clamped to 1 (`CAP_PROP_BUFFERSIZE = 1`), eliminating inter-thread frame queue lag. An internal `if vs.stopped: break` sentinel instantly terminates child threads upon emergency stop, preventing zombie camera processes;
+  - **4. Asynchronous Single-Buffer Zero-Latency VideoStream Engine, Hardware Failsafe & Exposure Lock**:
+    A dedicated daemon thread pulls camera frames with driver buffer size clamped to 1 (`CAP_PROP_BUFFERSIZE = 1`), eliminating inter-thread frame queue lag. In the standalone diagnostic workbench (`vision_gui.py` and `TianProject`), the Windows DirectShow backend (`cv2.CAP_DSHOW`) was integrated with zero sensor gain (`CAP_PROP_GAIN = 0`) to lock physical exposure, preventing driver popup prompts and screen flickering. An internal `if vs.stopped: break` sentinel instantly terminates child threads upon emergency stop, preventing zombie camera processes. Implemented `calib_data.npz` parameter persistence to avoid redundant calibrations;
   - **5. LAB Color Space CLAHE Adaptive Histogram Equalization**:
     Transforms frames to LAB color space, applying Contrast Limited Adaptive Histogram Equalization (`clipLimit=3.5, tileGridSize=(8, 8)`) to the L-channel, enhancing dark strokes and evening out asymmetric desk lamp illumination;
   - **6. 15px Core Margin Erosion & L-Channel Luminance Ratio Black Piece Classifier (`is_black_piece`)**:
