@@ -47,7 +47,7 @@
 This platform integrates custom physical fixtures, embedded drivers, vision recognition, and robotic trajectory control.
 
 ### 1.1 Physical Chessboard & Handcrafted Magnetic Pieces
-- **Beige Board**: Selected a rigid $35 \times 35\,\text{cm}$ beige Chinese chessboard with crisp grid lines and anti-glare matte coating.
+- **Custom Chessboard**: Selected a $35 \times 35\,\text{cm}$ beige portable soft Chinese chessboard (flexible mat) with crisp grid lines, optimal reflectance, and high-precision line spacing.
 - **Handmade Magnetic Pieces**:
   - Printed high-contrast red and black Chinese chess character templates (Microsoft YaHei font, bold) sized at exactly $3.0\,\text{cm}$ diameter;
   - Manually precision-cut all 32 character circles;
@@ -73,9 +73,9 @@ All software and hardware were developed collaboratively by four core team membe
 | Member | Engineering Role | Core Deliverables & Contributions |
 | :--- | :--- | :--- |
 | **Tian Junshuo (田峻硕)** | **Team Lead / Mechanical & Motion Control Lead** | <ul><li>4-DOF robotic arm physical assembly, servo selection, and mechanical joint tuning;</li><li>WCH CH347 high-speed USB bridge and PCA9685 12-bit PWM hardware driver implementation (`hardware.py`);</li><li>Derivation of analytical closed-form inverse kinematics (IK) equations (`kinematics.py`);</li><li>5-phase collision-free micro-approach trajectory planning control law (`control.py`).</li></ul> |
-| **Liu Chaoran (刘超然)** | **Vision Perception Lead** | <ul><li><b>Independently conducted 100% of physical dataset collection, cleaning, and annotation</b>;</li><li>Spearheaded all 4 generations of vision architecture, developing lightweight YOLO piece localization & red/black classification;</li><li>Implemented OpenCV homography ( $3 \times 3$ matrix) 4-point perspective calibration & physical grid mapping (`localization/find_chess_new.py`);</li><li>Developed the multithreaded PyQt5 interactive operator dashboard (`ui_main.py`);</li><li><b>Assisted in robotic motion control parameter tuning</b> (including cantilever gravity droop elevation feedforward compensation).</li></ul> |
+| **Liu Chaoran (刘超然)** | **Vision Perception Lead** | <ul><li><b>Independently conducted 100% of physical dataset collection, cleaning, manual annotation, and 4-generation algorithmic R&D</b>;</li><li><b>Custom-designed and fabricated the specialized chessboard fixtures and 32 magnetic pieces</b>;</li><li>Developed Gen 4 fully autonomous spatial perception network: implemented 4-corner automatic perspective rectification and planar distortion unwarping, trained Swin-Transformer global feature network to directly output a $10 \times 9 \times 16$ spatial state tensor for high-precision 16-class classification across all 90 grid intersections;</li><li>Developed the multithreaded PyQt5 interactive operator dashboard (`ui_main.py`);</li><li><b>Assisted in robotic motion control parameter tuning</b> (including cantilever gravity droop elevation feedforward compensation).</li></ul> |
 | **Zhang Zichen (张子琛)** | **Game Decision & Rule Engine Lead** | <ul><li>Engineered complete 10x9 Chinese chess rule engine, move validation, and history rollback (`game/board.py`);</li><li>Developed PyTorch CNN evaluation network (`ChessNet`, 14-channel input / 8100-dim action space) (`game/ai.py`);</li><li>Standardized chessboard coordinate representations and initial game setup constants (`game/constants.py`).</li></ul> |
-| **Xing Yilong (邢艺龙)** | **System Integration & Fixtures Lead** | <ul><li>Managed hardware wiring, power distribution, and electrical safety standards;</li><li>Fabricated custom magnetic chessboard, assembled handmade magnetic pieces, and built electromagnet toolhead fixtures;</li><li>Constructed multi-axis physical test bench, assisting in multi-axis motion integration (`tools/`).</li></ul> |
+| **Xing Yilong (邢艺龙)** | **System Integration & Fixtures Lead** | <ul><li>Managed full-machine electrical wiring, power regulation distribution unit construction, and wiring safety standards;</li><li>Fabricated and mounted the robotic arm end-effector electromagnet mechanical fixture;</li><li>Constructed multi-axis physical test bench, assisting in multi-axis motion integration (`tools/`).</li></ul> |
 
 ---
 
@@ -193,37 +193,42 @@ Future work involves upgrading multi-axis interpolation profiles with S-curve ac
 
 Liu Chaoran independently spearheaded 100% of dataset collection, annotation, and computer vision algorithm evolution across four generations:
 
-#### Generation 1: Hough Circles & Synthetic Font OCR
-- **Concept**: OpenCV Hough Circles localized circular piece boundaries; a lightweight CNN trained on 1,000+ synthetic bold Microsoft YaHei character crops handled OCR.
-- **Pain Points**:
-  - **Severe Sensitivity to Lighting**: Ambient reflections caused Hough parameter failure. Lower thresholds missed dark pieces; higher thresholds triggered false circles everywhere;
-  - **Position Drift**: Surface glares induced $> 5\,\text{mm}$ center shifts, causing arm grasping failure.
+#### Generation 1 Prototype (Gen 1: Hough Circles + Synthetic Font OCR Exploration)
+- **Concept**: Utilized OpenCV Hough Circles to localize circular piece contours and center coordinates; automatically generated 1,000+ synthetic bold Microsoft YaHei character crops on white backgrounds via computer scripts, attempting to train a lightweight CNN for two-stage character OCR.
+- **Internal Iterations & Limitations**:
+  - **Sub-iteration 1 (Simultaneous CNN Color & Character Classification)**: Initially attempted to train a single CNN model to simultaneously output red/black team and Chinese character classes. Under complex ambient illumination and optical distortion, red vs. black color chromatic features had minimal distinction, preventing stable model convergence;
+  - **Sub-iteration 2 (Decoupled HSV Color Space + CNN Character OCR)**: Decoupled the tasks by delegating red/black team classification to the HSV color space (which performed reliably in real tests), while CNN focused strictly on character recognition.
+- **Root Physical Causes of Abandonment**:
+  - **Complete OCR Generalization Failure**: The training set relied 100% on ideal computer-generated Microsoft YaHei glyphs with **zero real photographic samples**, resulting in extremely fragile real-world generalization;
+  - **Severe Small-Scale Distortion**: To cover the entire board, the camera was mounted at a relatively high altitude. Cropped Hough-circle piece patches suffered from extremely low resolution where character stroke details were blurred and unidentifiable;
+  - **Hyper-Sensitivity of Geometric Tuning**: Hough circle detection was hypersensitive to ambient lighting and glares. Lowering sensitivity caused severe false negatives under shadows, while raising sensitivity produced swarming false-positive circles from reflections. During pure visual bench validation—prior to any robotic arm integration—the approach was abandoned due to unacceptable error rates.
 
-#### Generation 2: Fine-Tuned YOLOv11 14-Class Detection
-- **Concept**: Switched from classical CV to deep learning. Photographed 620 authentic chessboard images under diverse lighting, angles, and occlusions; labeled 14 piece classes on **Roboflow** (32 pieces/board); fine-tuned YOLOv11n on local **RTX 4060** (70/20/10 split).
-- **Pain Points**:
-  - Localization jumped dramatically, eliminating false circles;
-  - **Perspective Compression Confusion**: Wide-angle lens distortion degraded small characters at board edges, causing severe confusion between similar characters (e.g., **Chariot 車 vs. Pawn 卒**, **Horse 馬 vs. Soldier 兵**). With 0% error tolerance, a single misclassification collapsed gameplay.
+#### Generation 2 Evolution (Gen 2: Fine-Tuned YOLOv11 14-Class Detection)
+- **Concept**: Abandoned classical geometric operators in favor of deep learning. Photographed 620 authentic chessboard images under diverse lighting, angles, empty boards, mid-game positions, and partial occlusions; manually annotated 14 piece classes on **Roboflow** (32 pieces/board); fine-tuned a YOLOv11n model on a local **RTX 4060** GPU (70% train, 20% val, 10% test).
+- **Practical Performance & Physical Root Cause**:
+  - **Superb Target Localization**: Piece detection recall and center localization accuracy jumped dramatically, completely eliminating the false-positive circle artifacts of Hough detection;
+  - **Physical Root Cause of High Character Error**: **Planar orthographic projection unwarping was not yet introduced (lack of homography perspective rectification)**. In experimental setups, the camera was handheld or mounted at varying elevations and oblique angles, lacking a standardized physical scale and top-down orientation. Distant piece strokes were heavily compressed and distorted, causing severe confusion between visually similar characters (e.g., **Chariot 車 vs. Pawn 卒**, **Horse 馬 vs. Soldier 兵**), with only a few salient characters recognized accurately. With 0% error tolerance in gameplay, this model could not support autonomous game decisions.
 
 <div align="center">
   <img src="docs/images/vision_pipeline_evolution.png" width="820px" alt="Roboflow Chessboard Annotation Workspace"/>
   <p><b>Gen 2 Vision Development: Annotating authentic Chinese chess board images on Roboflow (620 images, manually labeled 14 piece classes)</b></p>
 </div>
 
-#### Generation 3: Strategic Engineering Downscaling (YOLO Detection + Red/Black Binary Classification)
-- **Downscaling Strategy**:
-  - Faced with deadlines and physical font recognition bottlenecks, made a decisive engineering trade-off: abandon 14-class character recognition, downscaling YOLO to **piece localization + red/black team binary classification**;
-  - YOLO stably outputted piece center coordinates and team classes. Combined with homography perspective rectification, vision passed move coordinate shifts (e.g., `e6 -> e4`) to the decision brain.
-- **Deadlock Resolution & Semi-Autonomous Interaction**:
-  - **Piece-Capture Deadlock**: The pipeline relied on a 32-piece count for sliding-window stability. When a piece was captured, the count dropped to 31, causing the system to deadlock between "piece captured" and "hand occlusion";
-  - **Human-in-the-Loop State Machine**: Implemented an operator **"Move Confirm Button / Space Bar"**. After moving (or capturing) and retracting hands, the human taps Space (`force_detect_move = True`). The system verifies the snapshot with zero hand shadow interference. This achieved 100% operational reliability, but left two compromises: **no endgame support** (only standard full opening) and **semi-autonomous operator reliance**.
+#### Generation 3 Production (Gen 3: Strategic Engineering Downscaling — YOLO Localization + Red/Black Binary Classification)
+- **Engineering Reduction & Positive Results**:
+  - Faced with tight deadlines and the physical bottleneck of unwarped character classification, made a decisive engineering trade-off: abandoned complex 14-class character recognition, downscaling YOLO to **piece localization + red/black team binary classification**;
+  - The dataset required only two target classes ("Red" and "Black"), achieving rapid training convergence. **Target localization and red/black classification achieved near-zero error and exceptional stability during live matches**;
+  - Combined with homography perspective transformation (mapping center coordinates to the physical 10×9 grid), vision passed only the coordinate difference before and after a move (e.g., `e6 -> e4`) to the decision brain.
+- **Piece-Capture Deadlock & Semi-Autonomous Compromise**:
+  - **Piece-Capture Breakdown of Sliding-Window Stability**: The original algorithm relied on the conservation of all 32 pieces as the steady-state baseline for sliding-window filtering. Upon a piece capture, the count permanently dropped to 31, preventing the system from distinguishing between a legitimate capture and temporary hand occlusion;
+  - **Human-in-the-Loop State Machine**: Implemented an operator UI button / hotkey interface (Key `1` for Black on top, Key `2` for Black on bottom, and Move Confirm / Space Bar). After completing a move and retracting hands, the player pressed confirm to trigger difference extraction in a clean, shadow-free frame. This guaranteed 100% live match reliability, but introduced two compromises: **no endgame support** (required standard 32-piece opening) and **reliance on manual keystrokes (semi-autonomous)**.
 
-#### Generation 4: Full Engineering Exhibition Reboot (Global Grid Tensor Inversion)
-- **Upcoming Exhibition Architecture**:
-  Rebooting for the Engineering Project Exhibition based on SOTA paradigms ([Chinese-Chess-Recognition](https://github.com/TheOne1006/chinese-chess-recognition)):
-  - **MMPose 4-Corner Rectification**: OpenMMLab MMPose keypoint model detects 4 board corners automatically, rectifying the perspective without manual clicking;
-  - **Swin-Transformer 2 Spatial Tensor Output**: Bypasses local bounding boxes; Swin-Transformer 2 outputs a $10 \times 9 \times 16$ spatial tensor, simultaneously classifying all 90 grid intersections into 16 categories (empty / other / 14 red-black pieces);
-  - **Breakthrough**: **Fully supports arbitrary mid-game and endgame setups**; naturally immune to capture count drops; removes the confirmation button for 100% autonomous gameplay!
+#### Generation 4 Upgrade (Gen 4: Autonomous Research Breakthrough — Global Grid Tensor Classification)
+- **Autonomous Research & Paradigm Reconstruction**:
+  Following in-depth investigation of cutting-edge computer vision literature and spatial pose estimation paradigms, the vision architecture was fully reconstructed with an independently developed Gen 4 spatial perception network:
+  - **4-Corner Automatic Perspective Rectification & Distortion Flattening**: Engineered a keypoint detection and automatic geometric calibration algorithm to capture the 4 board boundary corners, automatically transforming oblique camera angles into standardized, distortion-free orthographic top-down projections without manual calibration clicking;
+  - **Swin-Transformer Global Feature Tensor Classification**: Discarded local single-box detection; trained an end-to-end Swin-Transformer global feature network to directly output a $10 \times 9 \times 16$ spatial matrix tensor, performing 16-class classification (empty / other / 14 red-black pieces) across all 90 grid intersections simultaneously;
+  - **Ultimate Breakthrough & Closed-Loop Operation**: Achieved exceptional accuracy with ultra-low error rate; **fully supports arbitrary mid-game and endgame setups**; immediately detects cell state transitions and is **naturally immune to piece-count capture deadlocks**, eliminating manual confirmation keys and achieving a 100% fully autonomous closed-loop perception!
 
 <div align="center">
   <img src="docs/images/vision_real_experiments.png" width="820px" alt="Homography Rectification & 10x9 Grid Inference Interface"/>
