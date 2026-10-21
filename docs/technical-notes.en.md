@@ -2,7 +2,6 @@
 
 [简体中文](technical-notes.zh-CN.md) · **English** · [日本語](technical-notes.ja.md) · [Project overview](../README_EN.md)
 
-
 **On this page:** [Vision](#vision-history) · [Models](#mathematical-models) · [Motion](#motion-hardware) · [Decision](#game-decision) · [Validation](#validation) · [Gallery](#hardware-gallery)
 This document explains design choices, algorithms, and evidence. It distinguishes the course prototype, historical experiments, and fourth-generation development. Runtime instructions are in the [setup guide](setup.en.md).
 
@@ -42,6 +41,24 @@ Similar characters remained difficult at camera distance. Mapping a detection ce
 ![Physical-board dataset annotation](images/vision_pipeline_evolution.png)
 
 The image illustrates annotation work, not a held-out recognition score.
+
+<a id="training-records"></a>
+
+### Historical training records and version mapping
+
+The local `PythonProject2/recognition/runs/detect/` archive contains the following `args.yaml` and `results.csv` files. Logged epochs count CSV data rows; configured epochs are the requested upper limit.
+
+| Experiment directory | Input size | Configured epoch limit | Logged epochs |
+| :--- | ---: | ---: | ---: |
+| `Chess_Robot_V3` | 640 | 100 | 100 |
+| `Chess_V4_Final` | 640 | 100 | 100 |
+| `Chess_V5_Ultimate_1280` | 1280 | 150 | 150 |
+| `Chess_V6_Pro_1280` | 1280 | 200 | 75 |
+| `Chess_V7_Ultra_Loc_1280` | 1280 | 150 | 137 |
+
+These records support the history of repeated training and input-resolution changes. Run identifiers V3–V7 do not correspond to the four vision generations in this document. Directory names alone do not identify detector classes: the historical relabeling script converts labels to one class, but each checkpoint must be matched with its contemporary data configuration, labels, and metadata.
+
+Some records were copied into `TianProject` and must not be counted as independent experiments. The full logs, old datasets, and models are not distributed here. This table documents training history; it does not turn detector metrics into physical-system accuracy.
 
 <a id="vision-generation-3"></a>
 
@@ -99,6 +116,17 @@ This screenshot shows a rectification/inference interface and a displayed 0.54 s
 
 ## Motion and hardware
 
+### Board coordinates and motion targets
+
+`control.py:board_to_physical` indexes columns a–i as c = 0–8 and rows as r = 0–9. The arm sits behind the black baseline: column a has positive x, and y increases toward the far side. Let w and h be grid spacing, h_r river spacing, y_0 the board offset, and z_b board height:
+
+```math
+x=(4-c)w,\qquad z=z_b,\qquad
+y=y_0+\begin{cases}rh,&0\le r\le4\\4h+h_r+(r-5)h,&5\le r\le9\end{cases}
+```
+
+The separate river term avoids treating the entire board as a uniformly spaced rectangle. `main.py:Coord` handles orientation conversion between vision, game coordinates, and arm-facing coordinates; image-grid coordinates are not millimeter targets.
+
 ### Geometry and compensation
 
 The checked-in link lengths are `L1 = 73`, `L2 = 231`, `L3 = 231`, `L4 = 66` mm. Board spacing is 34.2 mm, river spacing 34.0 mm, `BOARD_ORIGIN_Y = 200`, `BOARD_Z = −33`, and `SAFE_Z = 70` mm. Configuration values alone do not establish reach over the entire board.
@@ -116,7 +144,23 @@ D = sqrt(R_comp² + delta_z²)
 
 The solver checks two-link reach, applies the law of cosines to shoulder/elbow angles, and constrains the wrist toward a downward orientation. The height term is distance-dependent feedforward, not an identified elasticity model or feedback controller. No universal placement accuracy or IK runtime is claimed.
 
-`control.py` maps board positions to millimeters, interpolates Cartesian waypoints at nominal 50 Hz, and suppresses increments when total requested displacement is at most 0.1 mm. Pickup/placement uses clearance height, an 8 mm hover, slow vertical contact, magnet switching, and vertical withdrawal. Captures first transfer the target piece to the graveyard.
+### Control choices and tradeoffs
+
+| Engineering problem | Implemented method | Reason and scope |
+| :--- | :--- | :--- |
+| Fixed links and downward tool orientation | Two-link geometric IK, base rotation, and wrist constraint. | Direct geometric solution for this fixed mechanism, with a reach check first. |
+| Reach-dependent placement offsets | Empirical lateral, radial, and height correction. | Easy to tune against physical offsets; coefficients depend on hardware and calibration. |
+| Contact with neighboring pieces near the board | Clearance-height transfer, 8 mm hover, and slow vertical approach/withdrawal. | Explicit waypoints constrain approach direction; this is a prescribed path, not general obstacle search. |
+| Large command jumps and tiny displacement increments | Cartesian linear interpolation and a 0.1 mm increment threshold. | Splits travel into small steps; S-curve velocity planning is not implemented. |
+
+For a segment lasting T seconds, interpolation follows the equation below when the deadzone is ignored. Actual loop timing also includes computation, communication, and host scheduling.
+
+```math
+N=\max(1,\lfloor50T\rfloor),\qquad
+\mathbf{p}_i=\mathbf{p}_0+\frac{i}{N}(\mathbf{p}_{\mathrm{target}}-\mathbf{p}_0),\quad i=1,\ldots,N
+```
+
+If the requested total displacement on an axis is at most 0.1 mm, its loop increment is zero; the final target is still commanded. This is a software threshold, not positioning accuracy. Pickup/placement sequences approach, attach, lift, transfer, release, and withdraw. Captures remove the target piece before reusing the normal transfer routine.
 
 ### Electrical interfaces
 
@@ -128,7 +172,7 @@ The solver checks two-link reach, applies the law of cosines to shoulder/elbow a
 | Pulse conversion | `tick = int(clamped_us / 20000 * 4096)`. |
 | Electromagnet | GPIO2 mask `0x04` commands the relay. |
 
-The relay and physical pickup have no measured nanosecond-response guarantee. The PC commands pulses without a measured joint-position feedback channel.
+The PC sends I2C/GPIO commands through the USB bridge, coordinating servo and electromagnet interfaces without measured joint-position feedback.
 
 <a id="mathematical-models"></a>
 
@@ -190,7 +234,31 @@ n=\left\lfloor\frac{u}{20000}\times4096\right\rfloor,\qquad a^{\star}=\arg\max_{
 
 The current decision path contains no Minimax or Alpha–Beta search. Learned scoring needs `game/aaa.pth`; otherwise it explicitly chooses a random candidate. A network definition alone does not establish trained playing strength.
 
-`main.py` converts coordinates, handles captures, updates software state, and dispatches arm commands. It does not measure whether every physical placement succeeded.
+### State encoding and candidate filtering
+
+Fourteen channels represent seven piece types for each side. Occupied intersections are 1 in the matching channel and 0 elsewhere. A square is row × 9 + column; source × 90 + destination gives the action index. The 8,100-dimensional output contains all source/destination pairs, including combinations that violate piece movement rules.
+
+The network output therefore is not maximized over every action. The rule module generates candidates first, and inference compares only their logits. Raw logits are ranking scores, not calibrated probabilities of correct play. This combines explicit movement constraints with learned scoring rather than searching a multi-ply game tree.
+
+### Historical supervised learning from game records
+
+The team's local presentation archive contains `1ai(1).py`, a historical training path. It reads `CHESS_BOOKS`, replays moves, and constructs a 14 × 10 × 9 pre-move state and next-action label. A three-convolution network predicts 8,100 actions with `CrossEntropyLoss` and Adam. Function defaults are 20 epochs, batch size 32, and learning rate 0.001, with output `chess_ai_model.pth`. These are code settings, not proof of a completed training run or measured playing strength.
+
+For logits z, game-record labels t_i, and batch size B, the cross-entropy objective is:
+
+```math
+\mathcal{L}=-\frac{1}{B}\sum_{i=1}^{B}\log\frac{\exp z_{i,t_i}}{\sum_{k=0}^{8099}\exp z_{i,k}}
+```
+
+That historical file is not distributed in this repository. Its layer names and checkpoint filename differ from current `game/ai.py`; renaming a checkpoint does not establish compatibility. Another local version, `TianProject/game/ai.py`, uses two convolutions, while the current entry point uses three and a hidden fully connected layer. Reproduction requires matching code, training data, and checkpoint structure. Historical supervised learning and future self-play reinforcement learning are separate stages.
+
+<a id="system-coordination"></a>
+
+### Orchestration and state consistency
+
+In `main.py`, vision runs in a separate thread and submits human moves through `move_queue`. The main thread converts coordinates, checks and updates the board, and selects a response. It updates the software board before dispatching a transfer or capture.
+
+During actuation, `suppress_detection` blocks visual move reports while camera capture continues. After the sequence returns, the program updates the expected count, rebuilds the vision baseline, and restores reporting. This timing coordination prevents modules from triggering one another; it is not camera-based measurement and correction of placement error. Software-state updates, returned command sequences, and successful physical placements require separate validation.
 
 <a id="validation"></a>
 
