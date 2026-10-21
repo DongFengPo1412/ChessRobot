@@ -140,45 +140,45 @@ The following equations retain the main models needed to understand the implemen
 
 Let camera pixel coordinates be p = (x, y, 1) and board coordinates q = (u, v, 1), both homogeneous. Estimate H from four corners, then normalize to obtain grid coordinates. A homography corrects planar perspective; it does not replace lens-distortion calibration.
 
-$$
+```math
 \tilde{\mathbf{q}}=H\mathbf{p},\qquad u=\frac{\tilde q_1}{\tilde q_3},\quad v=\frac{\tilde q_2}{\tilde q_3}
-$$
+```
 
 ### ROI and temporal stabilization
 
 Expand each ROI corner radially from board center C with b = 60 pixels. The centroid EMA coefficient is 0.28; current code updates only beyond a 1.5-pixel displacement. Discrete grid positions use a 12-frame mode; energy and count gates are listed above.
 
-$$
+```math
 \mathbf{P}'_i=\mathbf{P}_i+b\frac{\mathbf{P}_i-\mathbf{C}}{\lVert\mathbf{P}_i-\mathbf{C}\rVert}
-$$
+```
 
-$$
+```math
 \hat{\mathbf{c}}_t=(1-\lambda)\hat{\mathbf{c}}_{t-1}+\lambda\mathbf{c}_t,\qquad\lambda=0.28
-$$
+```
 
 ### Analytical inverse kinematics
 
 Set R = R_comp and z = delta_z from the compensation definitions above; D is the shoulder-to-effective-wrist distance. Check two-link reach before applying the law of cosines. Angles below are in radians; code converts them to degrees and applies servo-reference offsets. The additional wrist compensation coefficient is currently zero.
 
-$$
+```math
 D=\sqrt{R^2+z^2},\qquad |L_2-L_3|\le D\le L_2+L_3
-$$
+```
 
-$$
+```math
 \alpha=\arccos\frac{L_2^2+D^2-L_3^2}{2L_2D},\qquad\gamma=\arccos\frac{L_2^2+L_3^2-D^2}{2L_2L_3}
-$$
+```
 
-$$
-\beta=\operatorname{atan2}(z,R),\quad q_2=\beta+\alpha,\quad q_3=q_2-(\pi-\gamma),\quad q_4=-\frac{\pi}{2}-q_3
-$$
+```math
+\beta=\mathrm{atan2}(z,R),\quad q_2=\beta+\alpha,\quad q_3=q_2-(\pi-\gamma),\quad q_4=-\frac{\pi}{2}-q_3
+```
 
 ### PWM and move selection
 
 In the PWM equation, u is the clamped pulse width in microseconds. Apply channel limits before converting to PCA9685 ticks. The network selects the highest score within the candidate set M returned by the rule module. Candidate validity is limited by that module implementation.
 
-$$
-n=\left\lfloor\frac{u}{20000}\,4096\right\rfloor,\qquad a^*=\operatorname*{arg\,max}_{m\in\mathcal{M}} f(S)_{\operatorname{idx}(m)}
-$$
+```math
+n=\left\lfloor\frac{u}{20000}\times4096\right\rfloor,\qquad a^{\star}=\arg\max_{m\in\mathcal{M}} f(S)_{\mathrm{idx}(m)}
+```
 
 <a id="game-decision"></a>
 

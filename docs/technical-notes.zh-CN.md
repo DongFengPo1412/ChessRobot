@@ -140,45 +140,45 @@ D = sqrt(R_comp² + delta_z²)
 
 设相机像素齐次坐标为 p = (x, y, 1)，棋盘坐标为 q = (u, v, 1)。H 由四个角点估计，齐次归一化后得到棋盘交点坐标。单应性校正平面透视，不替代相机镜头畸变标定。
 
-$$
+```math
 \tilde{\mathbf{q}}=H\mathbf{p},\qquad u=\frac{\tilde q_1}{\tilde q_3},\quad v=\frac{\tilde q_2}{\tilde q_3}
-$$
+```
 
 ### ROI 与时序稳定
 
 ROI 角点沿棋盘中心 C 的径向外扩 b = 60 px。中心点 EMA 系数为 0.28；当前代码仅在位移超过 1.5 px 时更新。12 帧离散位置历史采用众数选择，检测能量与数量门槛另见机制表。
 
-$$
+```math
 \mathbf{P}'_i=\mathbf{P}_i+b\frac{\mathbf{P}_i-\mathbf{C}}{\lVert\mathbf{P}_i-\mathbf{C}\rVert}
-$$
+```
 
-$$
+```math
 \hat{\mathbf{c}}_t=(1-\lambda)\hat{\mathbf{c}}_{t-1}+\lambda\mathbf{c}_t,\qquad\lambda=0.28
-$$
+```
 
 ### 解析逆运动学
 
 记 R = R_comp、z = delta_z，分别对应前文补偿半径与高度差；D 为肩关节到等效腕部目标的距离。满足两连杆可达条件后，以余弦定理求解。下式角度用弧度；代码转换为度，并按舵机参考姿态加入偏置。当前腕部附加补偿系数为 0。
 
-$$
+```math
 D=\sqrt{R^2+z^2},\qquad |L_2-L_3|\le D\le L_2+L_3
-$$
+```
 
-$$
+```math
 \alpha=\arccos\frac{L_2^2+D^2-L_3^2}{2L_2D},\qquad\gamma=\arccos\frac{L_2^2+L_3^2-D^2}{2L_2L_3}
-$$
+```
 
-$$
-\beta=\operatorname{atan2}(z,R),\quad q_2=\beta+\alpha,\quad q_3=q_2-(\pi-\gamma),\quad q_4=-\frac{\pi}{2}-q_3
-$$
+```math
+\beta=\mathrm{atan2}(z,R),\quad q_2=\beta+\alpha,\quad q_3=q_2-(\pi-\gamma),\quad q_4=-\frac{\pi}{2}-q_3
+```
 
 ### PWM 与走法选择
 
 PWM 式中 u 为限幅后的微秒脉宽，先受各通道上下限约束，再映射到 PCA9685 tick。决策网络在规则模块返回的候选集合 M 中取最高分。这里的候选集合受当前规则实现范围限制。
 
-$$
-n=\left\lfloor\frac{u}{20000}\,4096\right\rfloor,\qquad a^*=\operatorname*{arg\,max}_{m\in\mathcal{M}} f(S)_{\operatorname{idx}(m)}
-$$
+```math
+n=\left\lfloor\frac{u}{20000}\times4096\right\rfloor,\qquad a^{\star}=\arg\max_{m\in\mathcal{M}} f(S)_{\mathrm{idx}(m)}
+```
 
 <a id="game-decision"></a>
 

@@ -140,45 +140,45 @@ D = sqrt(R_comp² + delta_z²)
 
 カメラ画素の同次座標をp = (x, y, 1)、盤面をq = (u, v, 1)とします。4隅からHを推定し、同次座標を正規化して交点位置を求めます。ホモグラフィは平面の透視変形を補正しますが、レンズ歪みの校正を代替しません。
 
-$$
+```math
 \tilde{\mathbf{q}}=H\mathbf{p},\qquad u=\frac{\tilde q_1}{\tilde q_3},\quad v=\frac{\tilde q_2}{\tilde q_3}
-$$
+```
 
 ### ROIと時系列安定化
 
 ROIの各頂点を中心Cから半径方向へb = 60 px拡張します。中心座標EMAの係数は0.28で、現在は1.5 pxを超える変位時に更新します。離散交点位置は12フレームの最頻値を使い、エネルギーと個数の条件は前表に示しています。
 
-$$
+```math
 \mathbf{P}'_i=\mathbf{P}_i+b\frac{\mathbf{P}_i-\mathbf{C}}{\lVert\mathbf{P}_i-\mathbf{C}\rVert}
-$$
+```
 
-$$
+```math
 \hat{\mathbf{c}}_t=(1-\lambda)\hat{\mathbf{c}}_{t-1}+\lambda\mathbf{c}_t,\qquad\lambda=0.28
-$$
+```
 
 ### 解析逆運動学
 
 前述の補償値からR = R_comp、z = delta_zとし、Dを肩から等価手首目標までの距離とします。2リンクの到達条件を確認して余弦定理を適用します。下式はラジアンで、コードは度へ変換してサーボ基準のオフセットを加えます。手首の追加補償係数は現在ゼロです。
 
-$$
+```math
 D=\sqrt{R^2+z^2},\qquad |L_2-L_3|\le D\le L_2+L_3
-$$
+```
 
-$$
+```math
 \alpha=\arccos\frac{L_2^2+D^2-L_3^2}{2L_2D},\qquad\gamma=\arccos\frac{L_2^2+L_3^2-D^2}{2L_2L_3}
-$$
+```
 
-$$
-\beta=\operatorname{atan2}(z,R),\quad q_2=\beta+\alpha,\quad q_3=q_2-(\pi-\gamma),\quad q_4=-\frac{\pi}{2}-q_3
-$$
+```math
+\beta=\mathrm{atan2}(z,R),\quad q_2=\beta+\alpha,\quad q_3=q_2-(\pi-\gamma),\quad q_4=-\frac{\pi}{2}-q_3
+```
 
 ### PWMと着手選択
 
 PWM式のuは上下限に制限したマイクロ秒単位のパルス幅で、PCA9685のtickへ変換します。ネットワークはルールモジュールの候補集合M内で最大スコアを選択します。候補の妥当性は現在のルール実装範囲に依存します。
 
-$$
-n=\left\lfloor\frac{u}{20000}\,4096\right\rfloor,\qquad a^*=\operatorname*{arg\,max}_{m\in\mathcal{M}} f(S)_{\operatorname{idx}(m)}
-$$
+```math
+n=\left\lfloor\frac{u}{20000}\times4096\right\rfloor,\qquad a^{\star}=\arg\max_{m\in\mathcal{M}} f(S)_{\mathrm{idx}(m)}
+```
 
 <a id="game-decision"></a>
 
