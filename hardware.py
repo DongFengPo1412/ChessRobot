@@ -25,7 +25,8 @@ class PCA9685Driver:
 
     def _write_reg(self, reg, val):
         buf = (c_ubyte * 3)((self.i2c_addr << 1), reg, val)
-        self.ch347.CH347StreamI2C(self.dev_idx, 3, byref(buf), 0, None)
+        if not self.ch347.CH347StreamI2C(self.dev_idx, 3, byref(buf), 0, None):
+            raise IOError("CH347 register write failed")
 
     def _init_pca9685(self):
         self._write_reg(0x00, 0x11)  # Sleep
@@ -40,7 +41,8 @@ class PCA9685Driver:
         tick = int((safe_us / 20000.0) * 4096)
         base_reg = 0x06 + 4 * channel
         data = (c_ubyte * 6)((self.i2c_addr << 1), base_reg, 0, 0, tick & 0xFF, (tick >> 8) & 0xFF)
-        self.ch347.CH347StreamI2C(self.dev_idx, 6, byref(data), 0, None)
+        if not self.ch347.CH347StreamI2C(self.dev_idx, 6, byref(data), 0, None):
+            raise IOError("CH347 PWM write failed")
 
     # === 新增：电磁铁控制接口 ===
     def set_magnet(self, on: bool):
@@ -48,9 +50,11 @@ class PCA9685Driver:
         data = self.gpio2_mask if on else 0x00
         ok = self.ch347.CH347GPIO_Set(self.dev_idx, self.gpio2_mask, self.gpio2_mask, data)
         if not ok:
-            print("[警告] 电磁铁指令下发失败")
+            raise IOError("CH347 electromagnet command failed")
 
     def close(self):
         """释放资源"""
-        self.set_magnet(False)
-        self.ch347.CH347CloseDevice(self.dev_idx)
+        try:
+            self.set_magnet(False)
+        finally:
+            self.ch347.CH347CloseDevice(self.dev_idx)

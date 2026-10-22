@@ -90,7 +90,7 @@ python ui_main.py
 
 The interface has a **Start Match** button, a software stop button, logging, and Space/1/2 shortcuts. Clicking Start constructs the same hardware orchestrator.
 
-Two interfaces still need work: vision does not emit the assigned `ui_callback`, and board rendering expects piece objects while the board supplies tuples. Do not assume the embedded video or virtual board is functional in a fresh checkout. Use the CLI/OpenCV workflow for inspecting the current control path. GUI click scaling assumes an actual 640 × 360 display and 1280 × 720 input; verify the mapping before relying on GUI calibration.
+The GUI now receives calibration/tracking frames, maps clicks using actual frame dimensions, scaled pixmap size and letterboxing, and renders tuple pieces from locked board snapshots. Stop requests end capture and interpolation; shutdown no longer starts a homing motion. Camera/Qt/OpenCV integration and calibration accuracy still require physical testing.
 
 ## Troubleshooting
 

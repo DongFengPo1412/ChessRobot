@@ -93,14 +93,22 @@ class ChessVisionV15_4:
         cv2.namedWindow("Main_Vision")
         cv2.setMouseCallback("Main_Vision", self._on_mouse)
         while True:
+            if vs.stopped:
+                raise RuntimeError("Calibration stopped")
             frame = vs.read()
+            if frame is None:
+                raise RuntimeError("No camera frame during calibration")
             display = frame.copy()
             for i, pt in enumerate(self.roi_corners):
                 cv2.circle(display, tuple(pt), 10, (0, 255, 0), -1)
                 cv2.putText(display, f"Pt{i + 1}", (pt[0] + 10, pt[1]), 1, 1.5, (0, 255, 0), 2)
+            callback = getattr(self, "ui_callback", None)
+            if callback is not None:
+                callback(display.copy())
             cv2.imshow("Main_Vision", display)
             if len(self.roi_corners) == 4: break
-            cv2.waitKey(1)
+            if cv2.waitKey(1) & 0xFF == 27:
+                raise RuntimeError("Calibration cancelled")
 
         pts = np.array(self.roi_corners, dtype=np.float32)
         center = np.mean(pts, axis=0)
@@ -115,7 +123,7 @@ class ChessVisionV15_4:
         if roi.size == 0: return False
         lab = cv2.cvtColor(roi, cv2.COLOR_BGR2LAB)
         # 黑色亮度极低，L < 45
-        return (np.sum(lab[:, :, 0] < 45) / roi.size) > 0.5
+        return (np.count_nonzero(lab[:, :, 0] < 45) / lab[:, :, 0].size) > 0.5
 
     def set_black_view(self, mode):
         """黑方视角 a0 映射：黑方最右边的车为 a0"""
@@ -170,7 +178,7 @@ class ChessVisionV15_4:
                     black_y = [(b[1] + b[3]) / 2 for b in boxes if self.is_black_piece(frame, b)]
                     black_count_debug = len(black_y)
                     if black_count_debug >= 8:
-                        self.set_black_view(1 if np.mean(black_y) < 360 else 2)
+                        self.set_black_view(1 if np.mean(black_y) < frame.shape[0] / 2 else 2)
 
                 for tid, box, conf in zip(ids, boxes, confs):
                     # 双门槛逻辑
@@ -278,6 +286,9 @@ class ChessVisionV15_4:
                 cv2.putText(display_frame, f"Detecting Black: {black_count_debug}/8 (Press 1/2)", (700, 45), 1, 1.5,
                             (0, 255, 255), 2)
 
+            callback = getattr(self, "ui_callback", None)
+            if callback is not None:
+                callback(display_frame.copy())
             cv2.imshow("Main_Vision", display_frame)
             key = cv2.waitKey(1) & 0xFF
             if key == ord('q'):

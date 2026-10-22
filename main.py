@@ -225,8 +225,10 @@ class ChessRobotOrchestrator:
         x1, y1, x2, y2 = (int(c) for c in ai_move)
         is_capture = self.board.board[y2][x2] is not None
 
-        # 先更新逻辑棋盘
-        self.board.make_move(ai_move)
+        if not self.board.is_move_valid(ai_move):
+            print("AI returned an invalid move; stopping before hardware commands")
+            self.stop_event.set()
+            return False
         action = "吃子" if is_capture else "移位"
         print(f"🤖 AI决策: {ai_move} ({from_vis} → {to_vis}) [{action}]")
 
@@ -236,14 +238,21 @@ class ChessRobotOrchestrator:
         try:
             if is_capture:
                 self.arm.capture(from_vis, to_vis)
-                self.piece_count -= 1
             else:
                 self.arm.pick_and_place(from_vis, to_vis)
+            self.board.make_move(ai_move)
+            if is_capture:
+                self.piece_count -= 1
+        except Exception as exc:
+            print(f"Motion failed: {exc}. Inspect/reconcile the physical board before restarting.")
+            self.stop_event.set()
+            self.arm.request_stop()
+            return False
         finally:
-            # 机械臂已回到待命区，恢复视觉并重置基准
-            time.sleep(0.3)
-            self.vision.reset_baseline(self.piece_count)
-            self.vision.suppress_detection = False
+            if not self.stop_event.is_set():
+                time.sleep(0.3)
+                self.vision.reset_baseline(self.piece_count)
+                self.vision.suppress_detection = False
 
         return True
 
@@ -266,7 +275,11 @@ class ChessRobotOrchestrator:
 
         # 阻塞等待视觉完成标定 + 锁定初始棋盘
         print("⏳ 等待视觉锁定初始棋盘...")
-        if not self.vision_ready.wait(timeout=180):
+        deadline = time.monotonic() + 180
+        while not self.vision_ready.wait(timeout=0.1):
+            if self.stop_event.is_set() or time.monotonic() >= deadline:
+                break
+        if self.stop_event.is_set() or not self.vision_ready.is_set():
             print("❌ 视觉初始化超时，请检查摄像头和棋盘")
             self.shutdown()
             return

@@ -1,8 +1,10 @@
 from game.constants import INIT_BOARD, X_RANGE, Y_RANGE
+import threading
 
 
 class ChessBoard:
     def __init__(self):
+        self._lock = threading.RLock()
         # 初始化棋盘
         self.board = [row.copy() for row in INIT_BOARD]
         # 记录历史走法（用于AI匹配棋谱）
@@ -165,7 +167,7 @@ class ChessBoard:
                     and target_piece is not None
                     and not self.is_own_piece(x2, y2, is_red))
 
-    def is_move_valid(self, move_str: str) -> bool:
+    def _is_pseudo_legal_move(self, move_str: str) -> bool:
         """核心：校验走法是否符合象棋规则【修复所有匹配错误】"""
         try:
             (x1, y1), (x2, y2) = self.parse_move(move_str)
@@ -209,7 +211,51 @@ class ChessBoard:
 
         return False
 
+    def is_in_check(self, red):
+        side = "red" if red else "black"
+        kings = {piece[0]: (x, y) for y, row in enumerate(self.board)
+                 for x, piece in enumerate(row) if piece and piece[1] in ("jiang", "shuai")}
+        if side not in kings:
+            return True
+        x, y = kings[side]
+        opponent = kings.get("black" if red else "red")
+        if opponent and opponent[0] == x and self.is_path_clear(x, y, *opponent):
+            return True
+        old_turn = self.red_turn
+        try:
+            self.red_turn = not red
+            for ey, row in enumerate(self.board):
+                for ex, piece in enumerate(row):
+                    if piece and piece[0] != side and self._is_pseudo_legal_move(f"{ex}{ey}{x}{y}"):
+                        return True
+            return False
+        finally:
+            self.red_turn = old_turn
+
+    def snapshot(self):
+        with self._lock:
+            return [row[:] for row in self.board]
+
+    def is_move_valid(self, move_str: str) -> bool:
+        with self._lock:
+            return self._validate_move(move_str)
+
+    def _validate_move(self, move_str: str) -> bool:
+        if not self._is_pseudo_legal_move(move_str):
+            return False
+        (x1, y1), (x2, y2) = self.parse_move(move_str)
+        moving, captured = self.board[y1][x1], self.board[y2][x2]
+        self.board[y1][x1], self.board[y2][x2] = None, moving
+        try:
+            return not self.is_in_check(self.red_turn)
+        finally:
+            self.board[y1][x1], self.board[y2][x2] = moving, captured
+
     def make_move(self, move_str: str):
+        with self._lock:
+            return self._make_move(move_str)
+
+    def _make_move(self, move_str: str):
         """执行合法走法"""
         if not self.is_move_valid(move_str):
             raise ValueError("无效走法！")

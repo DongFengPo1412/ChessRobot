@@ -127,3 +127,7 @@ Starting the controller moves the arm toward standby. Complete hardware setup an
 [Technical notes](docs/technical-notes.en.md) cover algorithms, code references, results, and development status. The [setup guide](docs/setup.en.md) covers dependencies and operation. Each document links to its Chinese and Japanese versions.
 
 Code in this repository is provided under the [MIT License](LICENSE). The project uses Ultralytics YOLO, OpenCV, PyTorch, PyQt5, and WCH hardware interfaces. The fourth-generation study also draws on OpenMMLab and a referenced Chinese-chess recognition implementation, identified in the technical notes. Third-party components retain their respective licenses.
+
+## Maintenance and offline validation
+
+Maintenance revision (2026-10): fixed the black-pixel ratio, GUI video and tuple-based board display; move filtering now rejects self-check and facing generals. Each interpolation segment is checked by IK before dispatch, driver failures propagate, and robot moves are committed to the software board only after the command sequence returns successfully. Failure stops operation and requires physical inspection. A software stop does not cut hardware power. Seven offline regression tests pass; no camera, CH347 or robot was connected and historical placement results were not remeasured.

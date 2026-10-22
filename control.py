@@ -1,18 +1,26 @@
 import time
+import threading
+import math
 import config
 from hardware import PCA9685Driver
 from kinematics import KinematicsSolver
 
 
+class MotionError(RuntimeError):
+    """A command failed; physical board recovery requires inspection."""
+
+
 class ChessArmController:
 
-    def __init__(self):
+    def __init__(self, hardware=None, solver=None, auto_home=True):
 
         self.col_map = {char: i for i, char in enumerate("abcdefghi")}
 
-        self.hw = PCA9685Driver()
+        self.hw = hardware if hardware is not None else PCA9685Driver()
+        self._stop = threading.Event()
+        self._closed = False
 
-        self.solver = KinematicsSolver()
+        self.solver = solver if solver is not None else KinematicsSolver()
 
 
 
@@ -28,11 +36,17 @@ class ChessArmController:
 
         self.cur_x, self.cur_y, self.cur_z = self.WAIT_XYZ
 
-        self.go_to_wait()  # 开机自动进入待命态
+        if auto_home:
+            try:
+                self.go_to_wait()
+            except Exception:
+                self.hw.close()
+                raise
 
 
 
-    def board_to_physical(self, pos_str):
+    @staticmethod
+    def board_to_physical(pos_str):
 
         """
 
@@ -46,7 +60,9 @@ class ChessArmController:
 
         row = int(pos_str[1:])
 
-        col_idx = self.col_map[col_char]
+        if col_char not in "abcdefghi" or row not in range(10):
+            raise ValueError("Board coordinate must be a0..i9")
+        col_idx = ord(col_char) - ord('a')
 
 
 
@@ -93,7 +109,8 @@ class ChessArmController:
 
 
     def execute_move(self, x, y, z):
-
+        if self._stop.is_set():
+            raise MotionError("Motion stopped; inspect the physical board before restarting")
         res = self.solver.solve_ik(x, y, z)
 
         if res:
@@ -130,41 +147,28 @@ class ChessArmController:
 
         """线性插补规划，确保平滑（增加死区防止浮点漂移）"""
 
+        if not all(math.isfinite(v) for v in (tx, ty, tz, duration)) or duration < 0:
+            raise MotionError("Invalid motion target/duration")
         steps = max(1, int(duration * 50))
+        origin = self.cur_x, self.cur_y, self.cur_z
+        target = tx, ty, tz
+        delta = tuple(target[j] - origin[j] if abs(target[j] - origin[j]) > 0.1 else 0.0 for j in range(3))
+        path = [tuple(origin[j] + delta[j] * i / steps for j in range(3))
+                for i in range(1, steps + 1)]
+        # Preserve the small-axis dead zone, then finish at the exact target.
+        path[-1] = target
+        if any(self.solver.solve_ik(*point) is None for point in path):
+            raise MotionError("Unreachable interpolation path; no commands sent for this segment")
+        for point in path:
+            if not self.execute_move(*point):
+                raise MotionError("Motion command failed")
+            self.cur_x, self.cur_y, self.cur_z = point
+            if self._stop.wait(duration / steps):
+                raise MotionError("Motion interrupted")
+        return True
 
-       
-
-        # 【关键修复1】引入 0.1mm 的死区。
-
-        # 如果目标坐标和当前坐标差距极小（纯垂直升降时 XY 的差物理上应为0），强制将其归零，彻底切断舵机的水平微调信号。
-
-        dx = (tx - self.cur_x) / steps if abs(tx - self.cur_x) > 0.1 else 0.0
-
-        dy = (ty - self.cur_y) / steps if abs(ty - self.cur_y) > 0.1 else 0.0
-
-        dz = (tz - self.cur_z) / steps if abs(tz - self.cur_z) > 0.1 else 0.0
-
-
-
-        for _ in range(steps):
-
-            self.cur_x += dx
-
-            self.cur_y += dy
-
-            self.cur_z += dz
-
-            self.execute_move(self.cur_x, self.cur_y, self.cur_z)
-
-            time.sleep(duration / steps)
-
-           
-
-        self.cur_x, self.cur_y, self.cur_z = tx, ty, tz
-
-        self.execute_move(tx, ty, tz)
-
-
+    def request_stop(self):
+        self._stop.set()
 
     def pick_and_place(self, start, end, return_to_wait=True):
         """
@@ -251,9 +255,11 @@ class ChessArmController:
 
 
     def shutdown(self):
-
-        self.go_to_wait()
-
+        if self._closed:
+            return
+        self.request_stop()
+        self._closed = True
+        # Do not start a home motion after a failed/partial action.
         self.hw.close()
 
 

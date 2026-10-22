@@ -78,10 +78,11 @@ class ChessRobotUI(QMainWindow):
         # ---- 左侧：实时视频与虚拟棋盘 ----
         left_panel = QVBoxLayout()
         
-        # [核心修复]：强制将画面锁定为 640x360 (精确匹配 1280x720 的 16:9 比例)
-        # 这样能保证鼠标点击坐标 x2 就能完美还原到原始图像，不会发生标定点漂移
+        # Click mapping uses the actual frame/pixmap dimensions, including letterboxing.
         self.video_label = ClickableVideoLabel("正在初始化摄像头...")
         self.video_label.setFixedSize(640, 360) 
+        self.video_label.setAlignment(Qt.AlignCenter)
+        self._video_mapping = None
         self.video_label.setStyleSheet("border: 2px solid #555; background: black;")
         self.video_label.clicked_sig.connect(self.on_video_clicked)
         left_panel.addWidget(self.video_label)
@@ -134,9 +135,13 @@ class ChessRobotUI(QMainWindow):
             vision = self.orchestrator.vision
             # 如果处于标定阶段 (点数没满 4 个)
             if len(vision.roi_corners) < 4:
-                # 640x360 放大两倍精确还原到 1280x720 坐标系
-                orig_x = x * 2
-                orig_y = y * 2
+                if self._video_mapping is None:
+                    return
+                left, top, pw, ph, fw, fh = self._video_mapping
+                if not (left <= x < left + pw and top <= y < top + ph):
+                    return
+                orig_x = min(fw - 1, int((x - left) * fw / pw))
+                orig_y = min(fh - 1, int((y - top) * fh / ph))
                 vision.roi_corners.append([orig_x, orig_y])
                 if len(vision.roi_corners) == 4:
                     print("✅ UI 端完成四点标定，已下发至算法层。")
@@ -165,13 +170,16 @@ class ChessRobotUI(QMainWindow):
             # 开启循环监听棋盘更新（定时信号）
             def poll_board():
                 while not self.orchestrator.stop_event.is_set():
-                    self.comm.board_signal.emit(self.orchestrator.board.board)
+                    self.comm.board_signal.emit(self.orchestrator.board.snapshot())
                     time.sleep(0.5)
             threading.Thread(target=poll_board, daemon=True).start()
 
             self.orchestrator.run()
         except Exception as e:
             print(f"❌ 引擎线程崩溃: {e}")
+        finally:
+            if hasattr(self, 'orchestrator'):
+                self.orchestrator.shutdown()
 
     def start_logic(self):
         if not self.engine_thread.is_alive():
@@ -183,8 +191,15 @@ class ChessRobotUI(QMainWindow):
         print("🚨 急停信号发出！")
         if hasattr(self, 'orchestrator'):
             self.orchestrator.stop_event.set()
-            self.orchestrator.arm.shutdown()
-        sys.exit(0)
+            self.orchestrator.arm.request_stop()
+            self.orchestrator.vs.stop()
+        self.status_box.setText("系统状态: 已请求停止，请检查实物后重新启动")
+
+    def closeEvent(self, event):
+        self.emergency_stop()
+        if self.engine_thread.is_alive():
+            self.engine_thread.join(timeout=2.0)
+        event.accept()
 
     # ============================================================
     # 4. 界面刷新方法 (由信号触发)
@@ -194,7 +209,12 @@ class ChessRobotUI(QMainWindow):
         rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         h, w, ch = rgb_image.shape
         qt_image = QImage(rgb_image.data, w, h, ch * w, QImage.Format_RGB888)
-        self.video_label.setPixmap(QPixmap.fromImage(qt_image).scaled(640, 480, Qt.KeepAspectRatio))
+        rect = self.video_label.contentsRect()
+        pixmap = QPixmap.fromImage(qt_image).scaled(rect.size(), Qt.KeepAspectRatio)
+        self._video_mapping = (rect.x() + (rect.width() - pixmap.width()) // 2,
+                               rect.y() + (rect.height() - pixmap.height()) // 2,
+                               pixmap.width(), pixmap.height(), w, h)
+        self.video_label.setPixmap(pixmap)
 
     def update_log(self, text):
         self.console.append(text)
@@ -208,8 +228,11 @@ class ChessRobotUI(QMainWindow):
                 piece = board_matrix[r][c]
                 label = self.cells[r][c]
                 if piece:
-                    label.setText(piece.name)
-                    color = "red" if piece.is_red else "black"
+                    side, kind = piece
+                    names = {"ju":"车", "ma":"马", "pao":"炮", "xiang":"相" if side == "red" else "象",
+                             "shi":"仕" if side == "red" else "士", "jiang":"将", "shuai":"帅", "zu":"卒", "bing":"兵"}
+                    label.setText(names.get(kind, kind))
+                    color = "red" if side == "red" else "black"
                     label.setStyleSheet(f"background: #f0d5a0; border: 2px solid #8b4513; color: {color}; font-size: 20px; border-radius: 20px;")
                 else:
                     label.setText("·")

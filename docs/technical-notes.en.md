@@ -228,7 +228,7 @@ n=\left\lfloor\frac{u}{20000}\times4096\right\rfloor,\qquad a^{\star}=\arg\max_{
 
 ## Game decision and integration
 
-`game/board.py` implements the board, piece-specific movement constraints, candidate enumeration, turn switching, a history list, and termination when a general is absent. It does not implement a full check/checkmate adjudicator or general undo API. Candidate filtering inherits the rule module's limitations.
+`game/board.py` implements the board, piece-specific movement constraints, candidate enumeration, turn switching, a history list, and termination when a general is absent. It has no complete game adjudicator or general undo API. Candidate filtering inherits the rule module's limitations. Filtering includes self-check and facing generals; complete checkmate, stalemate and repetition adjudication remain unimplemented.
 
 `ChessNet` uses three 3 × 3 convolutional layers with channels 14 → 64 → 128 → 128, then linear layers 11,520 → 1,024 → 8,100. Input is a 14 × 10 × 9 piece-location tensor. An output index is `(source_row * 9 + source_col) * 90 + destination_row * 9 + destination_col`. The highest-scoring candidate returned by the rule module is selected.
 
@@ -256,9 +256,7 @@ That historical file is not distributed in this repository. Its layer names and 
 
 ### Orchestration and state consistency
 
-In `main.py`, vision runs in a separate thread and submits human moves through `move_queue`. The main thread converts coordinates, checks and updates the board, and selects a response. It updates the software board before dispatching a transfer or capture.
-
-During actuation, `suppress_detection` blocks visual move reports while camera capture continues. After the sequence returns, the program updates the expected count, rebuilds the vision baseline, and restores reporting. This timing coordination prevents modules from triggering one another; it is not camera-based measurement and correction of placement error. Software-state updates, returned command sequences, and successful physical placements require separate validation.
+In `main.py`, the vision thread submits human moves through `move_queue`. A robot response is validated and dispatched before its software move and capture count are committed. Failure stops operation and leaves visual reporting suppressed until the physical board is inspected. Each interpolation segment preflights all IK points; this does not make a complete capture sequence atomic.
 
 <a id="validation"></a>
 
@@ -268,15 +266,16 @@ The team reported **18 center-covering placements out of 20 consecutive moves**.
 
 Dataset counts and historical behavior reflect team records. This repository does not publish every raw image, run log, or a fourth-generation held-out benchmark.
 
-| Area | Observation | Consequence |
+| Area | Current implementation | Validation boundary |
 | :--- | :--- | :--- |
-| Color/orientation | `is_black_piece` divides a single-channel count by three-channel `roi.size`; the ratio cannot exceed 1/3, below the 0.5 threshold. | Automatic orientation cannot pass. Use manual selection until corrected and tested. |
-| GUI video | GUI assigns `ui_callback`, but current vision does not call it. | Embedded video is not fully wired; OpenCV windows remain relevant. |
-| GUI board | Rendering expects `piece.name` and `piece.is_red`; board pieces are tuples. | The display interface needs adaptation. |
-| Reach/configuration | `tools/calc_reach.py` has historical constants differing from active geometry/compensation; current far-edge targets can fail IK reach checks. | The tool cannot certify full-board reach for this checkout. Reconcile calibration before operation. |
-| Motion outcome | Interpolation does not propagate every failed `execute_move` result as a verified physical outcome. | Completed command sequences do not prove successful placements. |
+| Color/orientation | Brightness ratio uses single-channel pixel counts. | Synthetic black/white images pass; real lighting and orientation remain untested. |
+| GUI | Frame callback, tuple board, click mapping and stop path are wired. | No live camera/Qt integration test. |
+| Reach | `tools/calc_reach.py` reuses the active coordinate mapping and IK. | Geometry only; no certification of servo limits, collision clearance or full-board placement. |
+| Motion outcome | Segment IK preflight, driver error propagation and commit after command completion. | No placement sensor confirmation; failure needs manual recovery. |
 
-These observations concern the checked-in software and do not rewrite the historical demonstration record.
+Maintenance revision (2026-10): fixed the black-pixel ratio, GUI video and tuple-based board display; move filtering now rejects self-check and facing generals. Each interpolation segment is checked by IK before dispatch, driver failures propagate, and robot moves are committed to the software board only after the command sequence returns successfully. Failure stops operation and requires physical inspection. A software stop does not cut hardware power. Seven offline regression tests pass; no camera, CH347 or robot was connected and historical placement results were not remeasured.
+
+The active configuration rejects 11 of 90 board targets in the static IK scan; remeasure calibration before physical operation.
 
 <a id="hardware-gallery"></a>
 
@@ -295,8 +294,8 @@ These materials preserve physical evidence from the course prototype. They illus
 ## Next development milestones
 
 - **Vision:** identify the dataset/transformations; separate physical train/test scenes; train or fine-tune; report intersection-level and board-level results; test captures/occlusion; validate a state adapter on the robot.
-- **Motion:** align configuration and reach calculations; repeat placement tests over near/far and edge/center positions; compare smoother acceleration profiles with current interpolation.
+- **Motion:** use the shared reach tool to review calibration; repeat near/far, edge/center placement tests and compare smoother acceleration profiles with current interpolation.
 - **Decision:** test movement constraints and establish checkpoint provenance/strength, then select improvements with the module owner. Self-play reinforcement learning remains an exploratory option.
-- **Integration:** complete GUI interfaces and validate startup, stopping, capture recovery, and state synchronization.
+- **Integration:** physically validate GUI, startup/stopping, capture failure recovery and state synchronization.
 
 New results should state version, hardware, data/test conditions, metric, sample count, and limitations. Referenced implementations retain their licenses; contributions should identify the actual project-specific work.
