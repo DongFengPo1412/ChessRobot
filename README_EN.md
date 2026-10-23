@@ -73,7 +73,7 @@ Historical decision code also contains supervised learning from board-state/move
 
 1. **Perception and confirmation:** the vision thread keeps capturing frames. After human confirmation, board differences produce source/destination coordinates for the move queue.
 2. **State and decision:** the main thread converts coordinates, checks and applies the human move, then asks the rule module and decision network for a response.
-3. **Physical execution:** the orchestrator updates its software board and dispatches a transfer or capture. It suppresses visual move reports during actuation to avoid interpreting arm motion as a human move.
+3. **Physical execution:** validate the robot move, suppress visual reports, and execute the transfer or capture. Commit the software move and piece count only after the command sequence returns successfully; stop on failure for manual physical reconciliation.
 4. **Next turn:** after the motion sequence returns, the expected piece count and vision baseline are updated before waiting for the human again.
 
 Coordination relies on software state and command sequencing. Agreement with the physical board still requires hardware validation. [Orchestration and validation boundaries](docs/technical-notes.en.md#system-coordination)
