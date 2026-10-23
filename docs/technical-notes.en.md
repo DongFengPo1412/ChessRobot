@@ -299,3 +299,5 @@ These materials preserve physical evidence from the course prototype. They illus
 - **Integration:** physically validate GUI, startup/stopping, capture failure recovery and state synchronization.
 
 New results should state version, hardware, data/test conditions, metric, sample count, and limitations. Referenced implementations retain their licenses; contributions should identify the actual project-specific work.
+
+2026-10-24: pickup/drop, 8 mm hover and clearance waypoints are checked for both endpoints before a transfer. Captures also check the graveyard and attacking piece before moving or removing a piece. Each interpolation segment is still checked separately; this is not whole-action collision certification. Nine offline regressions pass. Calibration is unchanged and the current IK still rejects 11/90 targets, pending measured correction.

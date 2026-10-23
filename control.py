@@ -170,11 +170,34 @@ class ChessArmController:
     def request_stop(self):
         self._stop.set()
 
+    def _preflight_pick_targets(self, *positions, include_graveyard=False):
+        """Reject known unreachable pickup/drop waypoints before touching pieces.
+
+        Interpolated paths are still checked separately before each segment.
+        This geometric check does not certify servo limits or collision clearance.
+        """
+        if self._stop.is_set():
+            raise MotionError("Motion stopped; inspect the physical board before restarting")
+        targets = []
+        for position in positions:
+            x, y, z = self.board_to_physical(position)
+            targets.extend(((position, (x, y, config.SAFE_Z)),
+                            (position, (x, y, config.BOARD_Z + 8.0)),
+                            (position, (x, y, z))))
+        if include_graveyard:
+            x, y, z = self.GRAVEYARD_XYZ
+            targets.extend((("graveyard", (x, y, config.SAFE_Z)),
+                            ("graveyard", (x, y, z))))
+        for name, target in targets:
+            if self.solver.solve_ik(*target) is None:
+                raise MotionError(f"Unreachable {name} waypoint {target}; no pickup started")
+
     def pick_and_place(self, start, end, return_to_wait=True):
         """
         常规移位：s->e
         引入【微距垂直阶段】强制小臂优先拉升，防止刮蹭
         """
+        self._preflight_pick_targets(start, end)
         s_xyz = self.board_to_physical(start)
         e_xyz = self.board_to_physical(end)
         
@@ -224,6 +247,7 @@ class ChessArmController:
 
     def capture(self, start, end):
         """吃子动作：全流程应用微距垂直保护"""
+        self._preflight_pick_targets(start, end, include_graveyard=True)
         print(f">>> 执行吃子序列: 移除 {end}, 移动 {start}")
         e_xyz = self.board_to_physical(end)
         MICRO_Z = config.BOARD_Z + 8.0

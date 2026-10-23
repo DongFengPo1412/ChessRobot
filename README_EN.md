@@ -122,7 +122,7 @@ Starting the controller moves the arm toward standby. Complete hardware setup an
 
 - **Vision:** prepare project-specific piece crops and empty-board images, train and evaluate the rectified grid classifier, then integrate state changes with the robot. Include captures, partial occlusion, displaced pieces, and endgames in evaluation.
 - **Motion:** align reach calculations with the active calibration, repeat placement trials across the board, and investigate smoother acceleration profiles.
-- **Decision and integration:** validate movement constraints and checkpoint behavior, complete GUI interfaces, and evaluate future decision improvements against a defined baseline.
+- **Decision and integration:** validate movement constraints and checkpoint behavior, validate the connected GUI on hardware, and evaluate future decision improvements against a defined baseline.
 
 [Technical notes](docs/technical-notes.en.md) cover algorithms, code references, results, and development status. The [setup guide](docs/setup.en.md) covers dependencies and operation. Each document links to its Chinese and Japanese versions.
 
@@ -131,3 +131,5 @@ Code in this repository is provided under the [MIT License](LICENSE). The projec
 ## Maintenance and offline validation
 
 Maintenance revision (2026-10): fixed the black-pixel ratio, GUI video and tuple-based board display; move filtering now rejects self-check and facing generals. Each interpolation segment is checked by IK before dispatch, driver failures propagate, and robot moves are committed to the software board only after the command sequence returns successfully. Failure stops operation and requires physical inspection. A software stop does not cut hardware power. Seven offline regression tests pass; no camera, CH347 or robot was connected and historical placement results were not remeasured.
+
+2026-10-24: pickup/drop, 8 mm hover and clearance waypoints are checked for both endpoints before a transfer. Captures also check the graveyard and attacking piece before moving or removing a piece. Each interpolation segment is still checked separately; this is not whole-action collision certification. Nine offline regressions pass. Calibration is unchanged and the current IK still rejects 11/90 targets, pending measured correction.
