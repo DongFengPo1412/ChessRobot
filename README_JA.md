@@ -2,7 +2,7 @@
 
 カメラによる盤面認識と電磁石による駒の搬送を組み合わせた、4自由度の中国象棋ロボット。
 
-[简体中文](README.md) · [English](README_EN.md) · **日本語**
+[简体中文](README_ZH.md) · [English](README.md) · **日本語**
 
 **詳細を読む：** [視覚認識](docs/technical-notes.ja.md#vision-history) · [運動制御](docs/technical-notes.ja.md#motion-hardware) · [着手選択](docs/technical-notes.ja.md#game-decision) · [数学モデル](docs/technical-notes.ja.md#mathematical-models) · [実機ギャラリー](docs/technical-notes.ja.md#hardware-gallery) · [セットアップ](docs/setup.ja.md)
 
